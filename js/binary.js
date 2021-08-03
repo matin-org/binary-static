@@ -11801,7 +11801,7 @@ var Header = function () {
                     return { key: 'exluded_until', title: localize('Self-exclusion'), message: buildSpecificMessage(localizeKeepPlaceholders('Your account is restricted. Kindly [_1]contact customer support[_2] for assistance.'), ['' + formatDate(Client.get('excluded_until') || new Date()), '<a class="header__notification-link" href="https://www.deriv.' + getTopLevelDomain() + '/contact-us/">', '</a>']), type: 'danger' };
                 },
                 financial_limit: function financial_limit() {
-                    return { key: 'financial_limit', title: localize('Remove deposit limits'), message: buildMessage(localizeKeepPlaceholders('Please set your [_1]30-day turnover limit[_2] to remove deposit limits.'), 'user/security/self_exclusionws'), type: 'warning' };
+                    return { key: 'financial_limit', title: localize('Remove deposit limits'), message: buildMessage(localizeKeepPlaceholders('Please set your [_1]30-day turnover limit[_2] to remove deposit limits.'), Url.urlForDeriv('cashier/deposit', 'ext_platform_url=' + encodeURIComponent(window.location.href))), type: 'warning' };
                 }, // TODO: handle this when self exclusion is available
                 mt5_withdrawal_locked: function mt5_withdrawal_locked() {
                     return { key: 'mt5_withdrawal_locked', title: localize('MT5 withdrawal disabled'), message: localize('MT5 withdrawals have been disabled on your account. Please check your email for more details.'), type: 'warning' };
