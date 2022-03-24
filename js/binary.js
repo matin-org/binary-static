@@ -9708,7 +9708,7 @@ var getTopLevelDomain = function getTopLevelDomain() {
 };
 
 var getHostname = function getHostname() {
-    var is_staging = window.location.hostname === 'staging-smarttrader.deriv.com';
+    var is_staging = /staging-smarttrader/.test(window.location.hostname);
 
     return 'https://' + (is_staging ? 'staging-app' : 'app') + '.deriv.' + getTopLevelDomain();
 };
@@ -11117,7 +11117,7 @@ var Header = function () {
             binarybot: {
                 name: 'Binary Bot',
                 desc: localize('Our classic “drag-and-drop” tool for creating trading bots, featuring pop-up trading charts, for advanced users.'),
-                link: 'https://bot.deriv.com',
+                link: 'https://bot.deriv.' + getTopLevelDomain(),
                 icon: 'ic-brand-binarybot.svg',
                 on_mobile: true
             }
@@ -11158,6 +11158,8 @@ var Header = function () {
         var mobile_menu = getElementById('mobile__menu');
         var mobile_menu_close = getElementById('mobile__menu-close');
         var hamburger_menu = getElementById('header__hamburger');
+        var mobile_menu_livechat = getElementById('mobile__menu-livechat');
+        var mobile_menu__livechat_logo = getElementById('mobile__menu-header-livechat__logo');
         var mobile_menu_active = 'mobile__container--active';
         var showMobileMenu = function showMobileMenu(shouldShow) {
             if (shouldShow) {
@@ -11175,8 +11177,14 @@ var Header = function () {
         mobile_menu_close.addEventListener('click', function () {
             return showMobileMenu(false);
         });
+        mobile_menu_livechat.addEventListener('click', function () {
+            window.LC_API.open_chat_window();
+        });
 
-        // Notificatiopn Event
+        // Mobile Menu Livechat Icon
+        mobile_menu__livechat_logo.src = Url.urlForStatic('images/common/livechat.svg');
+
+        // Notification Event
         var notification_bell = getElementById('header__notiifcation-icon-container');
         var notification_container = getElementById('header__notification-container');
         var notification_close = getElementById('header__notification-close');
@@ -11335,6 +11343,16 @@ var Header = function () {
             if (!notification_container.contains(event.target) && !notification_bell.contains(event.target) && notification_container.classList.contains(notification_active)) {
                 showNotification(false);
             }
+        });
+
+        // Livechat Logo
+        var livechat_img = getElementById('livechat__logo');
+        livechat_img.src = Url.urlForStatic('images/common/livechat.svg');
+
+        // Livechat Launcher
+        var livechat = getElementById('livechat');
+        livechat.addEventListener('click', function () {
+            window.LC_API.open_chat_window();
         });
 
         // Language Popup.
@@ -15919,7 +15937,9 @@ var TradingAnalysis = function () {
      * navigation
      */
     var bindAnalysisTabEvent = function bindAnalysisTabEvent() {
-        $('#trade_analysis').find('li a').on('click', function (e) {
+        var trade_analysis_items = $('#trade_analysis').find('li a');
+        trade_analysis_items.attr('hrefLang', getLanguage().toLowerCase());
+        trade_analysis_items.on('click', function (e) {
             e.preventDefault();
             var li = e.target.parentElement;
             sessionStorage.setItem('currentAnalysisTab', li.id);
@@ -29149,6 +29169,8 @@ var domain_app_ids = { // these domains also being used in '_common/url.js' as s
     'smarttrader.deriv.app': 22168,
     'smarttrader.deriv.com': 22168,
     'smarttrader.deriv.me': 27315,
+    'smarttrader.deriv.be': 31224,
+    'staging-smarttrader.deriv.be': 31191,
     'binary.me': 15284,
     'deriv.com': 16929
 };
