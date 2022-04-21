@@ -11158,8 +11158,6 @@ var Header = function () {
         var mobile_menu = getElementById('mobile__menu');
         var mobile_menu_close = getElementById('mobile__menu-close');
         var hamburger_menu = getElementById('header__hamburger');
-        var mobile_menu_livechat = getElementById('mobile__menu-livechat');
-        var mobile_menu__livechat_logo = getElementById('mobile__menu-header-livechat__logo');
         var mobile_menu_active = 'mobile__container--active';
         var showMobileMenu = function showMobileMenu(shouldShow) {
             if (shouldShow) {
@@ -11177,14 +11175,8 @@ var Header = function () {
         mobile_menu_close.addEventListener('click', function () {
             return showMobileMenu(false);
         });
-        mobile_menu_livechat.addEventListener('click', function () {
-            window.LC_API.open_chat_window();
-        });
 
-        // Mobile Menu Livechat Icon
-        mobile_menu__livechat_logo.src = Url.urlForStatic('images/common/livechat.svg');
-
-        // Notification Event
+        // Notificatiopn Event
         var notification_bell = getElementById('header__notiifcation-icon-container');
         var notification_container = getElementById('header__notification-container');
         var notification_close = getElementById('header__notification-close');
@@ -11343,16 +11335,6 @@ var Header = function () {
             if (!notification_container.contains(event.target) && !notification_bell.contains(event.target) && notification_container.classList.contains(notification_active)) {
                 showNotification(false);
             }
-        });
-
-        // Livechat Logo
-        var livechat_img = getElementById('livechat__logo');
-        livechat_img.src = Url.urlForStatic('images/common/livechat.svg');
-
-        // Livechat Launcher
-        var livechat = getElementById('livechat');
-        livechat.addEventListener('click', function () {
-            window.LC_API.open_chat_window();
         });
 
         // Language Popup.
@@ -13190,25 +13172,24 @@ var submarket_order = {
     forex: 0,
     major_pairs: 1,
     minor_pairs: 2,
-    smart_fx: 3,
-    indices: 4,
-    asia_oceania: 5,
-    europe_africa: 6,
-    americas: 7,
-    otc_index: 8,
-    stocks: 9,
-    au_otc_stock: 10,
-    ge_otc_stock: 11,
-    india_otc_stock: 12,
-    uk_otc_stock: 13,
-    us_otc_stock: 14,
-    commodities: 15,
-    metals: 16,
-    energy: 17,
-    synthetic_index: 18,
-    random_index: 19,
-    random_daily: 20,
-    random_nightly: 21
+    indices: 3,
+    asia_oceania: 4,
+    europe_africa: 5,
+    americas: 6,
+    otc_index: 7,
+    stocks: 8,
+    au_otc_stock: 9,
+    ge_otc_stock: 10,
+    india_otc_stock: 11,
+    uk_otc_stock: 12,
+    us_otc_stock: 13,
+    commodities: 14,
+    metals: 15,
+    energy: 16,
+    synthetic_index: 17,
+    random_index: 18,
+    random_daily: 19,
+    random_nightly: 20
 };
 
 var ActiveSymbols = function () {
@@ -18387,11 +18368,12 @@ var commonTrading = function () {
 
     // Order
     var market_order = {
-        forex: 1,
-        synthetic_index: 2,
-        indices: 3,
-        stocks: 4,
-        commodities: 5
+        basket_index: 1,
+        forex: 2,
+        synthetic_index: 3,
+        indices: 4,
+        stocks: 5,
+        commodities: 6
     };
 
     var getMarketsOrder = function getMarketsOrder(market) {
