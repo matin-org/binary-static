@@ -11158,6 +11158,8 @@ var Header = function () {
         var mobile_menu = getElementById('mobile__menu');
         var mobile_menu_close = getElementById('mobile__menu-close');
         var hamburger_menu = getElementById('header__hamburger');
+        var mobile_menu_livechat = getElementById('mobile__menu-livechat');
+        var mobile_menu__livechat_logo = getElementById('mobile__menu-header-livechat__logo');
         var mobile_menu_active = 'mobile__container--active';
         var showMobileMenu = function showMobileMenu(shouldShow) {
             if (shouldShow) {
@@ -11175,8 +11177,14 @@ var Header = function () {
         mobile_menu_close.addEventListener('click', function () {
             return showMobileMenu(false);
         });
+        mobile_menu_livechat.addEventListener('click', function () {
+            window.LC_API.open_chat_window();
+        });
 
-        // Notificatiopn Event
+        // Mobile Menu Livechat Icon
+        mobile_menu__livechat_logo.src = Url.urlForStatic('images/common/livechat.svg');
+
+        // Notification Event
         var notification_bell = getElementById('header__notiifcation-icon-container');
         var notification_container = getElementById('header__notification-container');
         var notification_close = getElementById('header__notification-close');
@@ -11337,6 +11345,16 @@ var Header = function () {
             }
         });
 
+        // Livechat Logo
+        var livechat_img = getElementById('livechat__logo');
+        livechat_img.src = Url.urlForStatic('images/common/livechat.svg');
+
+        // Livechat Launcher
+        var livechat = getElementById('livechat');
+        livechat.addEventListener('click', function () {
+            window.LC_API.open_chat_window();
+        });
+
         // Language Popup.
         var current_language = Language.get();
         var available_languages = Object.entries(Language.getAll()).filter(function (language) {
@@ -11431,11 +11449,13 @@ var Header = function () {
             var loginid_demo_select = createElement('div');
             Client.getAllLoginids().forEach(function (loginid) {
                 if (!Client.get('is_disabled', loginid) && Client.get('token', loginid)) {
-                    // const account_title  = Client.getAccountTitle(loginid);
                     var is_real = /undefined|gaming|financial/.test(Client.getAccountType(loginid)); // this function only returns virtual/gaming/financial types
                     var currency = Client.get('currency', loginid);
-                    // const localized_type = localize('[_1] Account', is_real && currency ? currency : account_title);
-                    var icon = Url.urlForStatic(header_icon_base_path + 'ic-currency-' + (is_real ? currency ? currency.toLowerCase() : 'unknown' : 'virtual') + '.svg');
+                    var getIcon = function getIcon() {
+                        if (is_real) return currency ? currency.toLowerCase() : 'unknown';
+                        return 'virtual';
+                    };
+                    var icon = Url.urlForStatic(header_icon_base_path + 'ic-currency-' + getIcon() + '.svg');
                     var is_current = loginid === Client.get('loginid');
 
                     if (is_current) {
@@ -11583,7 +11603,10 @@ var Header = function () {
                 upgrade_link_txt = localize('Click here to open a Real Account');
                 upgrade_btn_txt = localize('Open a Real Account');
             } else if (upgrade_info.can_upgrade_to.length === 1) {
-                upgrade_link_txt = upgrade_info.type[0] === 'financial' ? localize('Click here to open a Financial Account') : upgrade_info.can_upgrade_to[0] === 'malta' ? localize('Click here to open a Gaming account') : localize('Click here to open a Real Account');
+                upgrade_link_txt = function upgrade_link_txt() {
+                    if (upgrade_info.type[0] === 'financial') return localize('Click here to open a Financial Account');
+                    return upgrade_info.can_upgrade_to[0] === 'malta' ? localize('Click here to open a Gaming account') : localize('Click here to open a Real Account');
+                };
                 upgrade_btn_txt = upgrade_info.type[0] === 'financial' ? localize('Open a Financial Account') : localize('Open a Real Account');
             }
 
@@ -13742,7 +13765,13 @@ var ChartSettings = function () {
         var barrier_style = params.is_tick_trade ? labels.barrier_line : labels.barrier_spot;
         var barrier = params.is_reset_barrier ? labels.reset_barrier : barrier_style;
         var start_time = labels.getStartTime(params.is_tick_trade);
-        txt_subtitle = (params.is_chart_delayed ? labels.delay : '') + (params.is_forward_starting ? labels.purchase_time : '') + (params.is_sold_before_start ? '' : start_time) + (params.is_tick_type ? params.is_sold_before_start || params.is_tick_trade ? '' : labels.entry_spot : '') + (params.has_barrier && !params.is_sold_before_start ? barrier : '') + (params.is_tick_type ? params.is_user_sold || params.is_tick_trade ? '' : labels.exit_spot : '') + (isReset(params.contract_type) ? labels.reset_time : '') + (is_high_low_ticks ? labels.selected_tick : '') + (params.show_end_time ? labels.getEndTime(params.is_tick_trade) : '') + (isCallputspread(params.contract_type) ? labels.payout_range : '');
+        txt_subtitle = (params.is_chart_delayed ? labels.delay : '') + (params.is_forward_starting ? labels.purchase_time : '') + (params.is_sold_before_start ? '' : start_time) + function () {
+            if (params.is_tick_type) return params.is_sold_before_start || params.is_tick_trade ? '' : labels.entry_spot;
+            return '';
+        } + (params.has_barrier && !params.is_sold_before_start ? barrier : '') + function () {
+            if (params.is_tick_type) return params.is_user_sold || params.is_tick_trade ? '' : labels.exit_spot;
+            return '';
+        } + (isReset(params.contract_type) ? labels.reset_time : '') + (is_high_low_ticks ? labels.selected_tick : '') + (params.show_end_time ? labels.getEndTime(params.is_tick_trade) : '') + (isCallputspread(params.contract_type) ? labels.payout_range : '');
     };
 
     var setChartOptions = function setChartOptions(params) {
@@ -15840,7 +15869,7 @@ var Endpoint = function () {
 
         $('#frm_endpoint').on('submit', function (e) {
             e.preventDefault();
-            var server_url = $server_url.val().trim().toLowerCase().replace(/[><()\/\"\']/g, '');
+            var server_url = $server_url.val().trim().toLowerCase().replace(/[><()/"']/g, '');
             var app_id = $app_id.val().trim();
             if (server_url) localStorage.setItem('config.server_url', server_url);
             if (app_id && !isNaN(app_id)) localStorage.setItem('config.app_id', parseInt(app_id));
@@ -17095,7 +17124,7 @@ var Highchart = function () {
     // initialize the chart only once with ticks or candles data
     var initChart = function () {
         var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(init_options) {
-            var data, type, i, pushTicks, history, candles, times, prices, current_time, el, display_decimals;
+            var data, type, i, pushTicks, history, candles, times, prices, current_time, el, display_decimals, getExitTime;
             return regeneratorRuntime.wrap(function _callee$(_context) {
                 while (1) {
                     switch (_context.prev = _context.next) {
@@ -17177,12 +17206,17 @@ var Highchart = function () {
                         case 14:
                             display_decimals = _context.sent;
 
+                            getExitTime = function getExitTime() {
+                                if (exit_tick_time) return exit_tick_time * 1000;
+                                return exit_time ? exit_time * 1000 : null;
+                            };
+
                             chart_options = {
                                 data: data,
                                 display_decimals: display_decimals,
                                 type: type,
                                 entry_time: (entry_tick_time || start_time) * 1000,
-                                exit_time: exit_tick_time ? exit_tick_time * 1000 : exit_time ? exit_time * 1000 : null, // eslint-disable-line do-not-nest-ternary
+                                exit_time: getExitTime(),
                                 has_zone: true,
                                 height: Math.max(el.parentElement.offsetHeight, 450),
                                 radius: 2,
@@ -17212,7 +17246,7 @@ var Highchart = function () {
                                 }
                             }));
 
-                        case 19:
+                        case 20:
                         case 'end':
                             return _context.stop();
                     }
@@ -26734,7 +26768,10 @@ var MetaTraderUI = function () {
             var region = server_info && server_info.geolocation.region;
             var sequence = server_info && server_info.geolocation.sequence;
             var is_synthetic = getAccountsInfo(acc_type).market_type === 'gaming' || getAccountsInfo(acc_type).market_type === 'synthetic';
-            var label_text = server_info ? sequence > 1 ? region + ' ' + sequence : region : getAccountsInfo(acc_type).info.display_server;
+            var label_text = function label_text() {
+                if (server_info) return sequence > 1 ? region + ' ' + sequence : region;
+                return getAccountsInfo(acc_type).info.display_server;
+            };
             setMTAccountText();
             $acc_item.find('.mt-login').text('(' + getAccountsInfo(acc_type).info.display_login + ')');
             if (server_info && is_synthetic && MetaTraderConfig.hasMultipleTradeServers(acc_type, accounts_info) || /unknown+$/.test(acc_type)) {
@@ -26838,7 +26875,10 @@ var MetaTraderUI = function () {
             var server_info = getAccountsInfo(acc_type).info.server_info;
             var region = server_info && server_info.geolocation.region;
             var sequence = server_info && server_info.geolocation.sequence;
-            var label_text = server_info ? sequence > 1 ? region + ' ' + sequence : region : getAccountsInfo(acc_type).info.display_server;
+            var label_text = function label_text() {
+                if (server_info) return sequence > 1 ? region + ' ' + sequence : region;
+                return getAccountsInfo(acc_type).info.display_server;
+            };
             $detail.find('.real-only').setVisibility(!is_demo);
             // Update account info
             $detail.find('.acc-info div[data]').map(function () {
