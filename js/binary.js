@@ -13724,6 +13724,7 @@ module.exports = showPopup;
 
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
+/* eslint-disable no-nested-ternary */
 var addComma = __webpack_require__(/*! ./currency */ "./src/javascript/app/common/currency.js").addComma;
 var isCallputspread = __webpack_require__(/*! ../pages/trade/callputspread */ "./src/javascript/app/pages/trade/callputspread.js").isCallputspread;
 var isReset = __webpack_require__(/*! ../pages/trade/reset */ "./src/javascript/app/pages/trade/reset.js").isReset;
@@ -13765,13 +13766,7 @@ var ChartSettings = function () {
         var barrier_style = params.is_tick_trade ? labels.barrier_line : labels.barrier_spot;
         var barrier = params.is_reset_barrier ? labels.reset_barrier : barrier_style;
         var start_time = labels.getStartTime(params.is_tick_trade);
-        txt_subtitle = (params.is_chart_delayed ? labels.delay : '') + (params.is_forward_starting ? labels.purchase_time : '') + (params.is_sold_before_start ? '' : start_time) + function () {
-            if (params.is_tick_type) return params.is_sold_before_start || params.is_tick_trade ? '' : labels.entry_spot;
-            return '';
-        } + (params.has_barrier && !params.is_sold_before_start ? barrier : '') + function () {
-            if (params.is_tick_type) return params.is_user_sold || params.is_tick_trade ? '' : labels.exit_spot;
-            return '';
-        } + (isReset(params.contract_type) ? labels.reset_time : '') + (is_high_low_ticks ? labels.selected_tick : '') + (params.show_end_time ? labels.getEndTime(params.is_tick_trade) : '') + (isCallputspread(params.contract_type) ? labels.payout_range : '');
+        txt_subtitle = (params.is_chart_delayed ? labels.delay : '') + (params.is_forward_starting ? labels.purchase_time : '') + (params.is_sold_before_start ? '' : start_time) + (params.is_tick_type ? params.is_sold_before_start || params.is_tick_trade ? '' : labels.entry_spot : '') + (params.has_barrier && !params.is_sold_before_start ? barrier : '') + (params.is_tick_type ? params.is_user_sold || params.is_tick_trade ? '' : labels.exit_spot : '') + (isReset(params.contract_type) ? labels.reset_time : '') + (is_high_low_ticks ? labels.selected_tick : '') + (params.show_end_time ? labels.getEndTime(params.is_tick_trade) : '') + (isCallputspread(params.contract_type) ? labels.payout_range : '');
     };
 
     var setChartOptions = function setChartOptions(params) {
