@@ -711,25 +711,9 @@ var ClientBase = function () {
         return is_current ? currency && !get('is_virtual') && has_account_criteria && !isCryptocurrency(currency) : has_account_criteria;
     };
 
-    var isDXTradeAllowed = function isDXTradeAllowed() {
-        // Stop showing DerivX for non-logged in EU users
-        var landing_companies = State.getResponse('landing_company');
-        var client_country = get('residence') || State.getResponse('website_status.clients_country');
-
-        return !!('dxtrade_financial_company' in landing_companies || 'dxtrade_gaming_company' in landing_companies || !client_country || !landing_companies || !Object.keys(landing_companies).length);
-    };
-
     var isMF = function isMF() {
         var landing_company_shortcode = get('landing_company_shortcode') || State.getResponse('landing_company.gaming_company.shortcode');
         return landing_company_shortcode === 'maltainvest';
-    };
-
-    var isMT5Allowed = function isMT5Allowed() {
-        // default allowing mt5 to true before landing_companies gets populated
-        // since most clients are allowed to use mt5
-        var landing_companies = State.getResponse('landing_company');
-
-        return !!('mt_financial_company' in landing_companies || 'mt_gaming_company' in landing_companies || !landing_companies || !Object.keys(landing_companies).length);
     };
 
     var isMultipliersOnly = function isMultipliersOnly() {
@@ -748,6 +732,48 @@ var ClientBase = function () {
         var options_blocked_countries = ['gb', 'im'];
         var country = get('country') || State.getResponse('authorize.country');
         return options_blocked_countries.includes(country);
+    };
+
+    var isHighRisk = function isHighRisk() {
+        var landing_companies = State.getResponse('landing_company');
+        var risk_classification = State.getResponse('get_account_status.risk_classification');
+
+        if (landing_companies) {
+            var financial_company_shortcode = void 0,
+                gaming_company_shortcode = void 0;
+            if (landing_companies.financial_company) {
+                financial_company_shortcode = landing_companies.financial_company.shortcode;
+            }
+            if (landing_companies.gaming_company) {
+                gaming_company_shortcode = landing_companies.gaming_company.shortcode;
+            }
+            var financial_restricted_countries = financial_company_shortcode === 'svg' && !gaming_company_shortcode;
+
+            var CFDs_restricted_countries = gaming_company_shortcode === 'svg' && !financial_company_shortcode;
+
+            var restricted_countries = financial_company_shortcode === 'svg' || gaming_company_shortcode === 'svg' && financial_company_shortcode !== 'maltainvest';
+
+            var high_risk = financial_company_shortcode === 'svg' && gaming_company_shortcode === 'svg';
+            return high_risk || restricted_countries || risk_classification === 'high' || financial_restricted_countries || CFDs_restricted_countries;
+        }
+
+        return false;
+    };
+
+    var isLowRisk = function isLowRisk() {
+        var landing_companies = State.getResponse('landing_company');
+        var upgradeable_landing_companies = State.getResponse('authorize.upgradeable_landing_companies');
+        if (landing_companies || upgradeable_landing_companies) {
+            var financial_company_shortcode = landing_companies.financial_company.shortcode;
+            var gaming_company_shortcode = void 0;
+            if (landing_companies.gaming_company) {
+                gaming_company_shortcode = landing_companies.gaming_company.shortcode;
+            }
+            var low_risk_landing_company = financial_company_shortcode === 'maltainvest' && gaming_company_shortcode === 'svg';
+            return low_risk_landing_company || upgradeable_landing_companies.include('svg') && upgradeable_landing_companies.include('maltainvest');
+        }
+
+        return false;
     };
 
     var syncWithDerivApp = function syncWithDerivApp(active_loginid, client_accounts) {
@@ -797,10 +823,8 @@ var ClientBase = function () {
 
     return {
         init: init,
-        isDXTradeAllowed: isDXTradeAllowed,
         isLoggedIn: isLoggedIn,
         isMF: isMF,
-        isMT5Allowed: isMT5Allowed,
         isMultipliersOnly: isMultipliersOnly,
         isValidLoginid: isValidLoginid,
         set: set,
@@ -811,6 +835,8 @@ var ClientBase = function () {
         getAccountType: getAccountType,
         isAccountOfType: isAccountOfType,
         isAuthenticationAllowed: isAuthenticationAllowed,
+        isHighRisk: isHighRisk,
+        isLowRisk: isLowRisk,
         isOptionsBlocked: isOptionsBlocked,
         isOfferingBlocked: isOfferingBlocked,
         getAccountOfType: getAccountOfType,
@@ -854,6 +880,23 @@ var localize = __webpack_require__(/*! ../localize */ "./src/javascript/_common/
 var getPropertyValue = __webpack_require__(/*! ../utility */ "./src/javascript/_common/utility.js").getPropertyValue;
 
 var currencies_config = {};
+
+var displayed_currencies = {
+    USD: localize('US Dollar'),
+    EUR: localize('Euro'),
+    GBP: localize('Pound Sterling'),
+    AUD: localize('Australian Dollar'),
+    BTC: localize('Bitcoin'),
+    ETH: localize('Ethereum'),
+    USDT: localize('Tether Omni'),
+    eUSDT: localize('Tether ERC20'),
+    USDC: localize('USD Coin'),
+    LTC: localize('Litecoin')
+};
+
+var mapCurrencyName = function mapCurrencyName(currency) {
+    return displayed_currencies[currency];
+};
 
 var getTextFormat = function getTextFormat(number, currency) {
     return addComma(number, getDecimalPlaces(currency), isCryptocurrency(currency)) + ' ' + getCurrencyDisplayCode(currency);
@@ -1016,6 +1059,7 @@ var getMinPayout = function getMinPayout(currency) {
 };
 
 module.exports = {
+    mapCurrencyName: mapCurrencyName,
     formatMoney: formatMoney,
     formatCurrency: formatCurrency,
     addComma: addComma,
@@ -3208,15 +3252,14 @@ var Language = function () {
     var all_languages = {
         ACH: 'Translations',
         EN: 'English',
-        // DE   : 'Deutsch', // TODO: uncomment to enable German language
+        DE: 'Deutsch',
         ES: 'Español',
         FR: 'Français',
-        ID: 'Indonesia',
         IT: 'Italiano',
+        // KO   : '한국어', // TODO: Uncomment when translations are ready
         PL: 'Polish',
-        PT: 'Português',
         RU: 'Русский',
-        // TH   : 'Thai', // TODO: uncomment to enable Thai language
+        TH: 'Thai',
         VI: 'Tiếng Việt',
         ZH_CN: '简体中文',
         ZH_TW: '繁體中文'
@@ -8137,6 +8180,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
 
 var moment = __webpack_require__(/*! moment */ "./node_modules/moment/moment.js");
+__webpack_require__(/*! moment/min/locales */ "./node_modules/moment/min/locales.js");
 var template = __webpack_require__(/*! ./utility */ "./src/javascript/_common/utility.js").template;
 
 var Localize = function () {
@@ -9284,7 +9328,6 @@ var Url = function () {
         'bot.binary.com': 'www.binary.bot',
         'developers.binary.com': 'developers.binary.com', // same, shouldn't change
         'academy.binary.com': 'academy.binary.com',
-        'tech.binary.com': 'tech.binary.com',
         'blog.binary.com': 'blog.binary.com'
     };
 
@@ -9795,10 +9838,6 @@ var BinaryLoader = function () {
     var active_script = null;
 
     var init = function init() {
-        if (!/\.html$/i.test(window.location.pathname)) {
-            window.location.pathname += '.html';
-            return;
-        }
 
         if (!isStorageSupported(localStorage) || !isStorageSupported(sessionStorage)) {
             Header.displayNotification({ key: 'storage_not_supported', title: 'Storage not supported', message: localize('Requires your browser\'s web storage to be enabled in order to function properly. Please enable it or exit private browsing mode.'), type: 'danger' });
@@ -9929,7 +9968,7 @@ var BinaryLoader = function () {
             } else if (Client.isLoggedIn() && Client.isOfferingBlocked()) {
                 displayMessage(error_messages.offerings_blocked());
             } else if (config.no_mf && Client.isLoggedIn() && Client.isAccountOfType('financial')) {
-                displayMessage(error_messages.no_mf());
+                displayUnavailable();
             }
         });
 
@@ -9968,6 +10007,34 @@ var BinaryLoader = function () {
                 Login.redirectToLogin();
             });
         }
+    };
+
+    var displayUnavailable = function displayUnavailable() {
+        var content = container.querySelector('#content .container');
+        if (!content) {
+            return;
+        }
+
+        var div_container = createElement('div', { class: 'platform-unavailable' });
+        var inner_container = createElement('div', { class: 'platform-unavailable-inner' });
+        var h1_title = createElement('h1', { text: localize('SmartTrader is unavailable for this account'), class: 'platform-unavailable-inner-title' });
+        var message = createElement('div', {
+            text: localize('Unfortunately, this trading platform is not available for EU Deriv account. Please switch to a non-EU account to continue trading.'),
+            class: 'platform-unavailable-inner-message'
+        });
+        var button = createElement('button', { text: localize('Switch to another account'), class: 'platform-unavailable-inner-button' });
+
+        div_container.appendChild(inner_container);
+        inner_container.appendChild(h1_title);
+        inner_container.appendChild(message);
+        inner_container.appendChild(button);
+
+        button.addEventListener('click', function (event) {
+            document.getElementById('acc_switcher').click();
+            event.stopPropagation();
+        });
+
+        content.html(div_container);
     };
 
     var handleNotAuthenticated = function handleNotAuthenticated() {
@@ -10223,7 +10290,7 @@ var BinaryPjax = function () {
         // put current content to cache, so we won't need to load it again
         if (content) {
             window.history.replaceState({ url: url }, title, url);
-            setDataPage(content, url);
+            setDataPage(content, window.location.pathname);
             params.container.dispatchEvent(new CustomEvent('binarypjax:after', { detail: content }));
         }
 
@@ -10239,8 +10306,10 @@ var BinaryPjax = function () {
         }
     };
 
-    var setDataPage = function setDataPage(content, url) {
-        content.setAttribute('data-page', url.match(/.+\/(.+)\.html.*/)[1]);
+    var setDataPage = function setDataPage(content, pathname) {
+        var filename = pathname.substr(pathname.lastIndexOf('/') + 1);
+        var page = filename.replace(/\.[^/.]+$/, '');
+        content.setAttribute('data-page', page);
     };
 
     var handleClick = function handleClick(event) {
@@ -10332,7 +10401,7 @@ var BinaryPjax = function () {
                 return;
             }
 
-            setDataPage(result.content, url);
+            setDataPage(result.content, window.location.pathname);
             cachePut(url, result);
             replaceContent(url, result, replace);
         };
@@ -10930,11 +10999,12 @@ var applyToAllElements = __webpack_require__(/*! ../../_common/utility */ "./src
 var createElement = __webpack_require__(/*! ../../_common/utility */ "./src/javascript/_common/utility.js").createElement;
 var findParent = __webpack_require__(/*! ../../_common/utility */ "./src/javascript/_common/utility.js").findParent;
 var getTopLevelDomain = __webpack_require__(/*! ../../_common/utility */ "./src/javascript/_common/utility.js").getTopLevelDomain;
+var getPlatformSettings = __webpack_require__(/*! ../../../templates/_common/brand.config */ "./src/templates/_common/brand.config.js").getPlatformSettings;
 var getHostname = __webpack_require__(/*! ../../_common/utility */ "./src/javascript/_common/utility.js").getHostname;
 var template = __webpack_require__(/*! ../../_common/utility */ "./src/javascript/_common/utility.js").template;
 var Language = __webpack_require__(/*! ../../_common/language */ "./src/javascript/_common/language.js");
+var mapCurrencyName = __webpack_require__(/*! ../../_common/base/currency_base */ "./src/javascript/_common/base/currency_base.js").mapCurrencyName;
 var isEuCountry = __webpack_require__(/*! ../common/country_base */ "./src/javascript/app/common/country_base.js").isEuCountry;
-var isEuCountrySelected = __webpack_require__(/*! ../../_common/utility */ "./src/javascript/_common/utility.js").isEuCountrySelected;
 
 var header_icon_base_path = '/images/pages/header/';
 
@@ -10951,12 +11021,12 @@ var Header = function () {
 
     var onLoad = function onLoad() {
         populateAccountsList();
-        setHeaderUrls();
-        BinarySocket.wait('authorize', 'landing_company').then(function () {
-            bindPlatform();
-        });
-        bindClick();
         bindSvg();
+        BinarySocket.wait('authorize', 'landing_company').then(function () {
+            setHeaderUrls();
+            bindPlatform();
+            bindClick();
+        });
         if (Client.isLoggedIn()) {
             displayAccountStatus();
         }
@@ -10966,11 +11036,20 @@ var Header = function () {
     };
 
     var setHeaderUrls = function setHeaderUrls() {
+        var url_add_account_dynamic = document.getElementById('url-add-account-dynamic');
         var btn__signup = getElementById('btn__signup');
         var static_url = Url.getStaticUrl();
         var signup_url = static_url + '/signup/';
         btn__signup.href = signup_url;
 
+        if (isEuCountry()) {
+            url_add_account_dynamic.classList.remove('url-add-account');
+            url_add_account_dynamic.classList.add('url-add-account-multiplier');
+        }
+
+        applyToAllElements('.url-appstore', function (el) {
+            el.href = Url.urlForDeriv('appstore/traders-hub', 'ext_platform_url=' + encodeURIComponent(window.location.href));
+        });
         applyToAllElements('.url-reports-positions', function (el) {
             el.href = Url.urlForDeriv('reports/positions', 'ext_platform_url=' + encodeURIComponent(window.location.href));
         });
@@ -10989,6 +11068,12 @@ var Header = function () {
         applyToAllElements('.url-add-account', function (el) {
             el.href = Url.urlForDeriv('redirect', 'action=add_account&ext_platform_url=' + encodeURIComponent(window.location.href));
         });
+        applyToAllElements('.url-add-account-multiplier', function (el) {
+            el.href = Url.urlForDeriv('redirect', 'action=add_account_multiplier&ext_platform_url=' + encodeURIComponent(window.location.href));
+        });
+        applyToAllElements('.url-manage-account', function (el) {
+            el.href = Url.urlForDeriv('redirect', 'action=manage_account&ext_platform_url=' + encodeURIComponent(window.location.href));
+        });
     };
 
     var onUnload = function onUnload() {
@@ -11004,8 +11089,7 @@ var Header = function () {
     };
 
     var bindSvg = function bindSvg() {
-        var add = getElementById('add_icon');
-        var cashier = getElementById('cashier_icon');
+        var cashier = getElementById('cashier-icon');
         var account = getElementById('header__account-settings');
         var menu = getElementById('header__hamburger');
         var empty = getElementById('header__notification-empty-img');
@@ -11017,6 +11101,14 @@ var Header = function () {
         var profit = getElementById('mobile__menu-content-submenu-icon-profit');
         var statement = getElementById('mobile__menu-content-submenu-icon-statement');
 
+        applyToAllElements('#add-account-icon', function (el) {
+            el.src = Url.urlForStatic(header_icon_base_path + 'ic-add-account.svg');
+        });
+
+        applyToAllElements('#appstore-icon', function (el) {
+            el.src = Url.urlForStatic(header_icon_base_path + 'ic-appstore-home.svg');
+        });
+
         applyToAllElements('.header__expand', function (el) {
             el.src = Url.urlForStatic(header_icon_base_path + 'ic-chevron-down.svg');
         });
@@ -11026,7 +11118,7 @@ var Header = function () {
         });
 
         applyToAllElements('.header__logo', function (el) {
-            el.src = Url.urlForStatic(header_icon_base_path + 'logo_smart_trader.svg');
+            el.src = Url.urlForStatic('' + header_icon_base_path + getPlatformSettings('smarttrader').icon);
         });
 
         applyToAllElements('.logout-icon', function (el) {
@@ -11037,13 +11129,20 @@ var Header = function () {
             el.src = Url.urlForStatic(header_icon_base_path + 'ic-reports.svg');
         });
 
+        applyToAllElements('.whatsapp-icon', function (el) {
+            el.src = Url.urlForStatic(header_icon_base_path + 'ic-whatsapp.svg');
+        });
+
+        applyToAllElements('.livechat-icon', function (el) {
+            el.src = Url.urlForStatic(header_icon_base_path + 'ic-livechat.svg');
+        });
+
         applyToAllElements('.btn__close', function (el) {
             el.src = Url.urlForStatic(header_icon_base_path + 'ic-close.svg');
         });
 
         cashier.src = Url.urlForStatic(header_icon_base_path + 'ic-cashier.svg');
         account.src = Url.urlForStatic(header_icon_base_path + 'ic-user-outline.svg');
-        add.src = Url.urlForStatic(header_icon_base_path + 'ic-add-circle.svg');
         empty.src = Url.urlForStatic(header_icon_base_path + 'ic-box.svg');
         bell.src = Url.urlForStatic(header_icon_base_path + 'ic-bell.svg');
         menu.src = Url.urlForStatic(header_icon_base_path + 'ic-hamburger.svg');
@@ -11064,61 +11163,41 @@ var Header = function () {
         if (platform_list.hasChildNodes()) {
             return;
         }
-        var client_country = Client.get('residence') || State.getResponse('website_status.clients_country');
         var is_logged_in = Client.isLoggedIn();
         var main_domain = getHostname();
         var should_show_bots_when_logged_in = Client.isAccountOfType('virtual') ? !Client.isMultipliersOnly() : !Client.isMF() && !Client.isOptionsBlocked();
         var should_show_bots = is_logged_in ? should_show_bots_when_logged_in : !isEuCountry();
-        var should_show_dmt5 = !is_logged_in || Client.isMT5Allowed();
-        var should_show_xtrade = is_logged_in ? Client.isDXTradeAllowed() : !isEuCountry() && !isEuCountrySelected(client_country);
 
         var platforms = _extends({
             dtrader: {
-                name: 'DTrader',
+                name: getPlatformSettings('dtrader').name,
                 desc: localize('A whole new trading experience on a powerful yet easy to use platform.'),
                 link: main_domain,
-                icon: 'ic-brand-dtrader.svg',
+                icon: getPlatformSettings('dtrader').icon,
                 on_mobile: true
             }
         }, should_show_bots ? {
             dbot: {
-                name: 'DBot',
+                name: getPlatformSettings('dbot').name,
                 desc: localize('Automated trading at your fingertips. No coding needed.'),
                 link: main_domain + '/bot',
-                icon: 'ic-brand-dbot.svg',
-                on_mobile: true
-            }
-        } : {}, should_show_dmt5 ? {
-            dmt5: {
-                name: 'DMT5',
-                desc: localize('Trade on Deriv MetaTrader 5 (DMT5), the all-in-one FX and CFD trading platform.'),
-                link: main_domain + '/mt5',
-                icon: 'ic-brand-dmt5.svg',
-                on_mobile: true
-
-            }
-        } : {}, should_show_xtrade ? {
-            derivx: {
-                name: 'Deriv X',
-                desc: localize('Trade FX and CFDs on a customisable, easy-to-use trading platform.'),
-                link: main_domain + '/derivx',
-                icon: 'ic-brand-dxtrade.svg',
+                icon: getPlatformSettings('dbot').icon,
                 on_mobile: true
             }
         } : {}, {
             smarttrader: {
-                name: 'SmartTrader',
+                name: getPlatformSettings('smarttrader').name,
                 desc: localize('Trade the world\'s markets with our popular user-friendly platform.'),
                 link: '#',
-                icon: 'logo_smart_trader.svg',
+                icon: getPlatformSettings('smarttrader').icon,
                 on_mobile: true
             }
         }, should_show_bots ? {
             binarybot: {
-                name: 'Binary Bot',
+                name: getPlatformSettings('bbot').name,
                 desc: localize('Our classic “drag-and-drop” tool for creating trading bots, featuring pop-up trading charts, for advanced users.'),
                 link: 'https://bot.deriv.' + getTopLevelDomain(),
-                icon: 'ic-brand-binarybot.svg',
+                icon: getPlatformSettings('bbot').icon,
                 on_mobile: true
             }
         } : {});
@@ -11210,6 +11289,7 @@ var Header = function () {
         var platform_dropdown = getElementById('platform__dropdown');
         var platform__list = getElementById('platform__list');
         var platform_dropdown_active = 'platform__dropdown--show';
+
         var showPlatformSwitcher = function showPlatformSwitcher(should_open) {
             if (should_open) {
                 platform_dropdown.classList.add(platform_dropdown_active);
@@ -11225,6 +11305,7 @@ var Header = function () {
         applyToAllElements('.platform__list-item', function (el) {
             el.addEventListener('click', function () {
                 showPlatformSwitcher(false);
+                showMobileMenu(false);
             });
         });
 
@@ -11265,10 +11346,27 @@ var Header = function () {
         var account_switcher_dropdown = getElementById('account__switcher-dropdown');
         var acc_expand = getElementById('header__acc-expand');
         var account_switcher_active = 'account__switcher-dropdown--show';
+        var current_active_login = Client.get('loginid');
+        var all_login_ids = Client.getAllLoginids();
+        var has_real_account = all_login_ids.some(function (loginid) {
+            return !/^VRT/.test(loginid);
+        });
+        var is_virtual = current_active_login.startsWith('VRTC');
+        var add_account_text_normal = document.getElementById('add-account-text-normal');
+        var add_account_text_eu_country = document.getElementById('add-account-text-eu');
         var showAccountSwitcher = function showAccountSwitcher(should_open) {
             if (should_open) {
                 account_switcher_dropdown.classList.add(account_switcher_active);
                 acc_expand.classList.add('rotated');
+                $('#acc_tabs').tabs({ active: is_virtual ? 1 : 0 });
+                if (isEuCountry()) {
+                    add_account_text_normal.style.display = 'none';
+                } else {
+                    add_account_text_eu_country.style.display = 'none';
+                }
+                if (isEuCountry() && has_real_account) {
+                    add_account_text_eu_country.parentElement.style.display = 'none';
+                }
             } else {
                 account_switcher_dropdown.classList.remove(account_switcher_active);
                 acc_expand.classList.remove('rotated');
@@ -11297,6 +11395,7 @@ var Header = function () {
         });
 
         // Mobile reports menu
+        var appstore_menu = getElementById('mobile__platform-switcher-item-appstore');
         var report_menu = getElementById('mobile__platform-switcher-item-reports');
         var menu = getElementById('mobile_menu-content');
         var submenu = getElementById('mobile__menu-content-submenu');
@@ -11312,6 +11411,10 @@ var Header = function () {
                 menu.classList.add(menu_active);
             }
         };
+
+        appstore_menu.addEventListener('click', function () {
+            showMobileSubmenu(false);
+        });
 
         report_menu.addEventListener('click', function () {
             showMobileSubmenu(true);
@@ -11343,6 +11446,12 @@ var Header = function () {
             if (!notification_container.contains(event.target) && !notification_bell.contains(event.target) && notification_container.classList.contains(notification_active)) {
                 showNotification(false);
             }
+        });
+
+        // whatsapp mobile menu
+        var whatsapp_mobile_drawer = getElementById('whatsapp-mobile-drawer');
+        whatsapp_mobile_drawer.addEventListener('click', function () {
+            return window.open('https://wa.me/35699578341', '_blank');
         });
 
         // Livechat Logo
@@ -11402,6 +11511,12 @@ var Header = function () {
             return window.location = 'https://www.deriv.' + getTopLevelDomain() + '/help-centre/';
         });
 
+        // WhatsApp.
+        var topbar_whatsapp = getElementById('topbar-whatsapp');
+        topbar_whatsapp.addEventListener('click', function () {
+            return window.open('https://wa.me/35699578341', '_blank');
+        });
+
         // Topbar fullscreen events.
         var topbar_fullscreen = getElementById('topbar-fullscreen');
         topbar_fullscreen.addEventListener('click', toggleFullscreen);
@@ -11442,21 +11557,46 @@ var Header = function () {
         Client.sendLogoutRequest();
     };
 
+    var bindHeaders = function bindHeaders() {
+        var high_risk_accounts_accordion_header = document.getElementById('high_risk_accounts');
+        var low_risk_non_eu_accordion_header = document.getElementById('low_risk_accounts_non_eu');
+        var low_risk_eu_accordion_header = document.getElementById('low_risk_accounts_eu');
+        var low_risk_eu_container = document.getElementById('account__switcher-accordion-eu');
+        if (Client.isHighRisk() || isEuCountry()) {
+            high_risk_accounts_accordion_header.style.display = 'flex';
+            low_risk_non_eu_accordion_header.style.display = 'none';
+            low_risk_eu_accordion_header.style.display = 'none';
+            low_risk_eu_container.style.display = 'none';
+        } else if (Client.isLowRisk()) {
+            high_risk_accounts_accordion_header.style.display = 'none';
+            low_risk_non_eu_accordion_header.style.display = 'flex';
+            low_risk_eu_accordion_header.style.display = 'flex';
+            $('<div class="account__switcher-seperator" />').insertBefore('#account__switcher-accordion-eu');
+        }
+    };
+
     var populateAccountsList = function populateAccountsList() {
         if (!Client.isLoggedIn()) return;
-        BinarySocket.wait('authorize', 'website_status', 'balance').then(function () {
-            var loginid_real_select = createElement('div');
+        BinarySocket.wait('authorize', 'website_status', 'balance', 'landing_company', 'get_account_status').then(function () {
+            bindHeaders();
+            var loginid_non_eu_real_select = createElement('div');
+            var loginid_eu_real_select = createElement('div');
             var loginid_demo_select = createElement('div');
             Client.getAllLoginids().forEach(function (loginid) {
                 if (!Client.get('is_disabled', loginid) && Client.get('token', loginid)) {
+                    var is_eu = loginid.startsWith('MF');
+                    var is_non_eu = loginid.startsWith('CR');
                     var is_real = /undefined|gaming|financial/.test(Client.getAccountType(loginid)); // this function only returns virtual/gaming/financial types
                     var currency = Client.get('currency', loginid);
+                    var currencyName = mapCurrencyName(currency);
+
                     var getIcon = function getIcon() {
                         if (is_real) return currency ? currency.toLowerCase() : 'unknown';
                         return 'virtual';
                     };
                     var icon = Url.urlForStatic(header_icon_base_path + 'ic-currency-' + getIcon() + '.svg');
-                    var is_current = loginid === Client.get('loginid');
+                    var current_active_login = Client.get('loginid');
+                    var is_current = loginid === current_active_login;
 
                     if (is_current) {
                         // default account
@@ -11466,10 +11606,13 @@ var Header = function () {
                             el.src = icon;
                         });
                     }
+                    if (current_active_login.startsWith('MF') && currency === 'EUR') {
+                        currencyName = localize('Multipliers');
+                    }
 
                     var account = createElement('div', { class: 'account__switcher-acc ' + (is_current ? 'account__switcher-acc--active' : ''), 'data-value': loginid });
                     var account_icon = createElement('img', { src: icon });
-                    var account_detail = createElement('span', { text: is_real ? currency || localize('Real') : localize('Demo') });
+                    var account_detail = createElement('span', { text: is_real ? currencyName || localize('Real') : localize('Demo') });
                     var account_loginid = createElement('div', { class: 'account__switcher-loginid', text: loginid });
                     var account_balance = createElement('span', { class: 'account__switcher-balance account__switcher-balance-' + loginid });
 
@@ -11488,12 +11631,15 @@ var Header = function () {
                     account.appendChild(account_detail);
                     account.appendChild(account_balance);
 
-                    if (is_real) {
-                        loginid_real_select.appendChild(account);
+                    if (is_non_eu) {
+                        loginid_non_eu_real_select.appendChild(account);
+                    } else if (is_eu && !isEuCountry()) {
+                        loginid_eu_real_select.appendChild(account);
+                    } else if (is_eu && isEuCountry()) {
+                        loginid_non_eu_real_select.appendChild(account);
                     } else {
                         loginid_demo_select.appendChild(account);
                     }
-
                     // const link    = createElement('a', { href: `${'javascript:;'}`, 'data-value': loginid });
                     // const li_type = createElement('li', { text: localized_type });
 
@@ -11501,13 +11647,22 @@ var Header = function () {
                     // link.appendChild(li_type);
                     // loginid_select.appendChild(link).appendChild(createElement('div', { class: 'separator-line-thin-gray' }));
                 }
-                applyToAllElements('#account__switcher-real-list', function (el) {
-                    el.insertBefore(loginid_real_select, el.firstChild);
+
+                applyToAllElements('#account__switcher-non-eu-list', function (el) {
+                    el.insertBefore(loginid_non_eu_real_select, el.firstChild);
                     applyToAllElements('div.account__switcher-acc', function (ele) {
                         ele.removeEventListener('click', loginIDOnClick);
                         ele.addEventListener('click', loginIDOnClick);
                     }, '', el);
-                    bindAccordion('#account__switcher-accordion-real');
+                    bindAccordion('#account__switcher-accordion-non-eu');
+                });
+                applyToAllElements('#account__switcher-eu-list', function (el) {
+                    el.insertBefore(loginid_eu_real_select, el.firstChild);
+                    applyToAllElements('div.account__switcher-acc', function (ele) {
+                        ele.removeEventListener('click', loginIDOnClick);
+                        ele.addEventListener('click', loginIDOnClick);
+                    }, '', el);
+                    bindAccordion('#account__switcher-accordion-eu');
                 });
                 applyToAllElements('#account__switcher-demo-list', function (el) {
                     el.insertBefore(loginid_demo_select, el.firstChild);
@@ -11518,17 +11673,86 @@ var Header = function () {
                     bindAccordion('#account__switcher-accordion-demo');
                 });
             });
-            bindTabs();
         });
+        bindTabs();
     };
 
     var bindTabs = function bindTabs() {
-        var is_virtual_tab = /^VRT/.test(Client.get('loginid'));
+        var all_login_ids = Client.getAllLoginids();
+        var real_accounts = all_login_ids.filter(function (loginid) {
+            return !/^VRT/.test(loginid);
+        });
+        var has_real_account = real_accounts.length > 0;
+        var has_mf_account = all_login_ids.some(function (loginid) {
+            return loginid.startsWith('MF');
+        });
+        var has_non_eu_account = all_login_ids.some(function (loginid) {
+            return loginid.startsWith('CR');
+        });
+        var has_multiple_CR_accounts = all_login_ids.filter(function (loginid) {
+            return loginid.startsWith('CR');
+        }).length > 1;
+        var current_active_login = Client.get('loginid');
+        var manage_acc_btn = document.getElementById('account__switcher-manage');
+        var new_account_adder_deriv = document.getElementById('account__switcher-new-account-deriv');
+        var new_account_adder_eu = document.getElementById('account__switcher-new-account-eu');
+        var traders_hub_link = document.getElementById('account__switcher-cfd');
+        var account_switcher_seperator = document.getElementById('cfd-link-seperator');
+        var multiplier_text = localize('Multipliers');
+        var account_header = document.querySelectorAll('.header__accounts-multiple');
+        var is_virtual = void 0;
+        if (current_active_login) {
+            is_virtual = current_active_login.startsWith('VRTC');
+        }
+        var showTradersHubLink = function showTradersHubLink(show) {
+            traders_hub_link.style.display = show ? 'flex' : 'none';
+            account_switcher_seperator.style.display = show ? 'block' : 'none';
+        };
+
+        account_header.forEach(function (header) {
+            header.innerText += has_multiple_CR_accounts ? localize('accounts') : localize('account');
+        });
+
+        if (current_active_login.startsWith('MF')) {
+            $('<span class="header__acc-display-text">' + multiplier_text + '</span>').insertAfter('#header__acc-balance');
+        }
+
+        if (has_real_account) showTradersHubLink(true);
+        if (is_virtual) showTradersHubLink(true);
+        if (is_virtual || !has_real_account) {
+            manage_acc_btn.style.visibility = 'hidden';
+        }
+        if (has_real_account && !is_virtual) {
+            manage_acc_btn.style.visibility = 'visible';
+        }
+        // Account adder logic
+        new_account_adder_deriv.style.display = 'flex';
+        new_account_adder_eu.style.display = 'flex';
+        if (has_real_account) {
+            if (has_mf_account && has_non_eu_account) {
+                new_account_adder_deriv.style.display = 'none';
+                new_account_adder_eu.style.display = 'none';
+            } else if (has_mf_account && !has_non_eu_account) {
+                new_account_adder_eu.style.display = 'none';
+            } else if (!has_mf_account && has_non_eu_account) {
+                new_account_adder_deriv.style.display = 'none';
+            }
+        }
 
         $('#acc_tabs').tabs({
-            active: is_virtual_tab ? 1 : 0,
-            activate: function activate() {
+            active: is_virtual ? 1 : 0,
+            event: 'click',
+            activate: function activate(ui) {
                 updateTotal();
+                var currentTab = ui.currentTarget.hash;
+                if (currentTab === '#demo_tab') {
+                    manage_acc_btn.style.visibility = 'hidden';
+                    showTradersHubLink(true);
+                } else if (currentTab === '#real_tab' && has_real_account && !is_virtual) {
+                    manage_acc_btn.style.visibility = 'visible';
+                } else if (currentTab === '#real_tab' && !has_real_account) {
+                    showTradersHubLink(false);
+                }
             }
         });
     };
@@ -12449,7 +12673,11 @@ var Page = function () {
                                 return filtered_account;
                             };
                             // reload the page when the client account values(except balance and startsession) is changed on other pages.
-                            if (removedSessionAndBalnce(evt.newValue) !== removedSessionAndBalnce(evt.oldValue)) {
+                            var active_loginid = LocalStore.get('active_loginid');
+                            var new_currency = JSON.parse(evt.newValue)[active_loginid].currency;
+                            var old_currency = JSON.parse(evt.oldValue)[active_loginid].currency;
+
+                            if (removedSessionAndBalnce(evt.newValue) !== removedSessionAndBalnce(evt.oldValue) && old_currency !== new_currency) {
                                 reload();
                             }
                         }
@@ -13245,13 +13473,19 @@ var ActiveSymbols = function () {
         }
 
         var all_markets = groupBy(all_symbols, 'market');
-        Object.keys(all_markets).forEach(function (key) {
+        var derived_markets = groupBy(all_markets.synthetic_index, 'subgroup');
+        delete all_markets.synthetic_index;
+        var final_markets = _extends({}, all_markets, derived_markets);
+
+        Object.keys(final_markets).forEach(function (key) {
             var market_name = key;
-            var market_symbols = all_markets[key];
+            var market_symbols = final_markets[key];
             var symbol = market_symbols[0];
             markets[market_name] = {
-                name: symbol.market_display_name,
-                is_active: !symbol.is_trading_suspended && symbol.exchange_is_open
+                name: symbol.market === 'synthetic_index' ? symbol.subgroup_display_name : symbol.market_display_name,
+                is_active: !symbol.is_trading_suspended && symbol.exchange_is_open,
+                subgroup_name: symbol.subgroup_display_name !== 'None' ? symbol.market_display_name : symbol.subgroup_display_name,
+                subgroup: symbol.subgroup !== 'none' ? symbol.market : symbol.subgroup
             };
             getSubmarketsForMarket(market_symbols, markets[market_name]);
         });
@@ -13296,7 +13530,7 @@ var ActiveSymbols = function () {
                     symbol_type: symbol.symbol_type,
                     is_active: !symbol.is_trading_suspended && symbol.exchange_is_open,
                     pip: symbol.pip,
-                    market: symbol.market,
+                    market: symbol.market !== 'synthetic_index' ? symbol.market : symbol.subgroup,
                     submarket: symbol.submarket
                 };
             });
@@ -13598,8 +13832,8 @@ var createLanguageDropDown = function createLanguageDropDown(website_status) {
 
     $languages.find('#display_language li, ' + select_language_id + ' li').addClass(current_language).find('span.language').text(mapCodeToLanguage(current_language));
 
-    // TODO: REMOVE/CHANGE this after addition of DE or TH languages
-    var unsupported_languages = ['de', 'th'];
+    // TODO: Add unsupported languages to this array
+    var unsupported_languages = ['ko'];
 
     var languages = website_status.supported_languages.sort(function (a, b) {
         return a === 'EN' || a < b ? -1 : 1;
@@ -14168,8 +14402,10 @@ var isEuCountry = function isEuCountry() {
     var eu_excluded_regex = new RegExp('^mt$');
     var financial_shortcode = State.getResponse('landing_company.financial_company.shortcode');
     var gaming_shortcode = State.getResponse('landing_company.gaming_company.shortcode');
+    var svg_shortcode = gaming_shortcode === 'svg';
     var clients_country = Client.get('residence') || State.getResponse('website_status.clients_country');
-    return financial_shortcode || gaming_shortcode ? eu_shortcode_regex.test(financial_shortcode) || eu_shortcode_regex.test(gaming_shortcode) : eu_excluded_regex.test(clients_country);
+
+    return financial_shortcode || gaming_shortcode ? eu_shortcode_regex.test(financial_shortcode) && !svg_shortcode || eu_shortcode_regex.test(gaming_shortcode) : eu_excluded_regex.test(clients_country);
 };
 
 var isIndonesia = function isIndonesia() {
@@ -20592,14 +20828,14 @@ var Durations = function () {
             duration_wrapper_element.classList.add('error-msg');
             duration_min_element.classList.remove('invisible');
             duration_max_element.classList.add('invisible');
-            elementInnerHtml(duration_tooltip_element, 'Minimum:');
+            elementInnerHtml(duration_tooltip_element, localize('Minimum:'));
             Reset.hideResetTime();
         } else if (+duration_max_element.textContent && +duration_amount_element.value > +duration_max_element.textContent) {
             duration_amount_element.classList.add('error-field');
             duration_wrapper_element.classList.add('error-msg');
             duration_min_element.classList.add('invisible');
             duration_max_element.classList.remove('invisible');
-            elementInnerHtml(duration_tooltip_element, 'Maximum:');
+            elementInnerHtml(duration_tooltip_element, localize('Maximum:'));
             Reset.hideResetTime();
         } else {
             duration_amount_element.classList.remove('error-field');
@@ -20609,7 +20845,7 @@ var Durations = function () {
             } else {
                 duration_min_element.classList.remove('invisible');
                 duration_max_element.classList.add('invisible');
-                elementInnerHtml(duration_tooltip_element, 'Minimum:');
+                elementInnerHtml(duration_tooltip_element, localize('Minimum:'));
                 Reset.hideResetTime();
             }
         }
@@ -21423,6 +21659,8 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.init = undefined;
 
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 var _class, _temp, _initialiseProps;
@@ -21439,6 +21677,10 @@ var _reactDom = __webpack_require__(/*! react-dom */ "./node_modules/react-dom/i
 
 var _reactDom2 = _interopRequireDefault(_reactDom);
 
+var _classnames = __webpack_require__(/*! classnames */ "./node_modules/classnames/index.js");
+
+var _classnames2 = _interopRequireDefault(_classnames);
+
 var _symbols = __webpack_require__(/*! ./symbols */ "./src/javascript/app/pages/trade/symbols.js");
 
 var _symbols2 = _interopRequireDefault(_symbols);
@@ -21452,6 +21694,8 @@ var _active_symbols = __webpack_require__(/*! ../../common/active_symbols */ "./
 var _common_functions = __webpack_require__(/*! ../../../_common/common_functions */ "./src/javascript/_common/common_functions.js");
 
 var _localize = __webpack_require__(/*! ../../../_common/localize */ "./src/javascript/_common/localize.js");
+
+var _os_detect = __webpack_require__(/*! ../../../_common/os_detect */ "./src/javascript/_common/os_detect.js");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -21482,66 +21726,137 @@ var List = function List(_ref) {
     var arr = _ref.arr,
         saveRef = _ref.saveRef,
         underlying = _ref.underlying,
-        onUnderlyingClick = _ref.onUnderlyingClick;
-    return arr.map(function (_ref2, idx) {
-        var _ref3 = _slicedToArray(_ref2, 2),
-            market_code = _ref3[0],
-            obj = _ref3[1];
+        onUnderlyingClick = _ref.onUnderlyingClick,
+        groupMarkets = _ref.groupMarkets;
 
-        return _react2.default.createElement(
-            'div',
-            {
-                className: 'market',
-                key: idx,
-                id: market_code + '_market',
-                ref: saveRef.bind(null, market_code)
-            },
-            _react2.default.createElement(
-                'div',
-                { className: 'market_name' },
-                obj.name
-            ),
-            Object.entries(obj.submarkets).sort(function (a, b) {
-                return (0, _active_symbols.sortSubmarket)(a[0], b[0]);
-            }).map(function (_ref4, idx_2) {
-                var _ref5 = _slicedToArray(_ref4, 2),
-                    key = _ref5[0],
-                    submarket = _ref5[1];
-
-                return (// eslint-disable-line no-unused-vars
+    var group_markets = groupMarkets(arr);
+    return _react2.default.createElement(
+        _react2.default.Fragment,
+        null,
+        Object.keys(group_markets).map(function (item) {
+            var derived_category = group_markets[item].markets[0].key;
+            return group_markets[item].markets.map(function (obj, idx) {
+                return item === 'none' ? _react2.default.createElement(
+                    'div',
+                    { key: item + '_' + idx },
                     _react2.default.createElement(
                         'div',
-                        { className: 'submarket', key: idx_2 },
+                        {
+                            className: 'market',
+                            key: idx,
+                            id: obj.key + '_market',
+                            ref: saveRef.bind(null, obj.key)
+                        },
                         _react2.default.createElement(
                             'div',
-                            { className: 'submarket_name' },
-                            submarket.name
+                            { className: 'market_name' },
+                            obj.name
+                        ),
+                        Object.entries(obj.submarket).sort(function (a, b) {
+                            return (0, _active_symbols.sortSubmarket)(a[0], b[0]);
+                        }).map(function (_ref2, idx_2) {
+                            var _ref3 = _slicedToArray(_ref2, 2),
+                                key = _ref3[0],
+                                submarket = _ref3[1];
+
+                            return (// eslint-disable-line no-unused-vars
+                                _react2.default.createElement(
+                                    'div',
+                                    { className: 'submarket', key: idx_2 },
+                                    _react2.default.createElement(
+                                        'div',
+                                        { className: 'submarket_name' },
+                                        submarket.name
+                                    ),
+                                    _react2.default.createElement(
+                                        'div',
+                                        { className: 'symbols' },
+                                        Object.entries(submarket.symbols).map(function (_ref4) {
+                                            var _ref5 = _slicedToArray(_ref4, 2),
+                                                u_code = _ref5[0],
+                                                symbol = _ref5[1];
+
+                                            return _react2.default.createElement(
+                                                'div',
+                                                {
+                                                    className: 'symbol_name ' + (u_code === underlying ? 'active' : ''),
+                                                    key: u_code,
+                                                    id: u_code,
+                                                    onClick: onUnderlyingClick.bind(null, u_code, obj.key)
+                                                },
+                                                symbol.display
+                                            );
+                                        })
+                                    )
+                                )
+                            );
+                        })
+                    )
+                ) : _react2.default.createElement(
+                    'div',
+                    { key: item + '_' + idx },
+                    _react2.default.createElement(
+                        'div',
+                        {
+                            className: 'subgroup',
+                            key: idx,
+                            id: obj.key + '_market',
+                            ref: saveRef.bind(null, obj.key)
+                        },
+                        obj.key === derived_category && (0, _os_detect.isMobile)() && _react2.default.createElement(
+                            'div',
+                            { className: 'label' },
+                            obj.subgroup_name
                         ),
                         _react2.default.createElement(
                             'div',
-                            { className: 'symbols' },
-                            Object.entries(submarket.symbols).map(function (_ref6) {
-                                var _ref7 = _slicedToArray(_ref6, 2),
-                                    u_code = _ref7[0],
-                                    symbol = _ref7[1];
+                            { className: 'subgroup_name' },
+                            obj.name
+                        ),
+                        Object.entries(obj.submarket).sort(function (a, b) {
+                            return (0, _active_symbols.sortSubmarket)(a[0], b[0]);
+                        }).map(function (_ref6, idx_2) {
+                            var _ref7 = _slicedToArray(_ref6, 2),
+                                key = _ref7[0],
+                                submarket = _ref7[1];
 
-                                return _react2.default.createElement(
+                            return (// eslint-disable-line no-unused-vars
+                                _react2.default.createElement(
                                     'div',
-                                    {
-                                        className: 'symbol_name ' + (u_code === underlying ? 'active' : ''),
-                                        key: u_code,
-                                        id: u_code,
-                                        onClick: onUnderlyingClick.bind(null, u_code, market_code)
-                                    },
-                                    symbol.display
-                                );
-                            })
-                        )
+                                    { className: 'submarket', key: idx_2 },
+                                    _react2.default.createElement(
+                                        'div',
+                                        { className: 'submarket_name' },
+                                        submarket.name
+                                    ),
+                                    _react2.default.createElement(
+                                        'div',
+                                        { className: 'symbols' },
+                                        Object.entries(submarket.symbols).map(function (_ref8) {
+                                            var _ref9 = _slicedToArray(_ref8, 2),
+                                                u_code = _ref9[0],
+                                                symbol = _ref9[1];
+
+                                            return _react2.default.createElement(
+                                                'div',
+                                                {
+                                                    className: 'symbol_name ' + (u_code === underlying ? 'active' : ''),
+                                                    key: u_code,
+                                                    id: u_code,
+                                                    onClick: onUnderlyingClick.bind(null, u_code, obj.key)
+                                                },
+                                                symbol.display
+                                            );
+                                        })
+                                    )
+                                )
+                            );
+                        })
                     )
                 );
-            })
-        );
-    });
+            });
+        })
+    );
 };
 
 var Markets = (_temp = _class = function (_React$Component) {
@@ -21575,6 +21890,12 @@ var Markets = (_temp = _class = function (_React$Component) {
             });
             _defaults2.default.set('market', market_symbol);
         }
+        _this.keys_arr = [];
+        _this.markets_all.forEach(function (market) {
+            if (market[1].subgroup !== 'none') {
+                _this.keys_arr.push(market[0]);
+            }
+        });
         _this.el_underlying = (0, _common_functions.getElementById)('underlying');
         _this.references = {};
         _this.state = {
@@ -21590,7 +21911,9 @@ var Markets = (_temp = _class = function (_React$Component) {
             markets: markets_arr,
             active_market: market_symbol,
             query: '',
-            open_dropdown_scroll_id: 0
+            open_dropdown_scroll_id: 0,
+            open_accordion: false,
+            subgroup_active: false
         };
         _this.el_underlying.value = underlying_symbol;
         return _this;
@@ -21625,7 +21948,9 @@ var Markets = (_temp = _class = function (_React$Component) {
                 underlying = _state.underlying,
                 query = _state.query,
                 market = _state.market,
-                open = _state.open;
+                open = _state.open,
+                open_accordion = _state.open_accordion,
+                subgroup_active = _state.subgroup_active;
             var getCurrentUnderlying = this.getCurrentUnderlying,
                 openDropdown = this.openDropdown,
                 closeDropdown = this.closeDropdown,
@@ -21634,8 +21959,12 @@ var Markets = (_temp = _class = function (_React$Component) {
                 saveMarketRef = this.saveMarketRef,
                 onUnderlyingClick = this.onUnderlyingClick,
                 saveRef = this.saveRef,
-                scrollToMarket = this.scrollToMarket;
+                scrollToMarket = this.scrollToMarket,
+                groupMarkets = this.groupMarkets,
+                toggleAccordion = this.toggleAccordion;
 
+
+            var group_markets = groupMarkets(markets);
 
             return _react2.default.createElement(
                 'div',
@@ -21696,23 +22025,70 @@ var Markets = (_temp = _class = function (_React$Component) {
                             _react2.default.createElement(
                                 'div',
                                 { className: 'desktop' },
-                                markets.map(function (_ref8) {
-                                    var _ref9 = _slicedToArray(_ref8, 2),
-                                        key = _ref9[0],
-                                        obj = _ref9[1];
-
+                                Object.keys(group_markets).map(function (item, idx) {
                                     return _react2.default.createElement(
                                         'div',
-                                        {
-                                            className: 'market ' + (active_market === key ? 'active' : ''),
-                                            key: key,
-                                            onClick: scrollToMarket.bind(null, '' + key)
-                                        },
-                                        _react2.default.createElement('span', { className: 'icon ' + key + ' ' + (active_market === key ? 'active' : '') }),
-                                        _react2.default.createElement(
-                                            'span',
+                                        { key: item + '_' + idx },
+                                        item === 'none' ? _react2.default.createElement(
+                                            'div',
                                             null,
-                                            obj.name
+                                            group_markets[item].markets.map(function (m) {
+                                                return _react2.default.createElement(
+                                                    'div',
+                                                    {
+                                                        className: 'market ' + (active_market === m.key ? 'active' : ''),
+                                                        key: m.key,
+                                                        onClick: scrollToMarket.bind(null, '' + m.key)
+                                                    },
+                                                    _react2.default.createElement('span', { className: 'icon ' + m.key + ' ' + (active_market === m.key ? 'active' : '') }),
+                                                    _react2.default.createElement(
+                                                        'span',
+                                                        null,
+                                                        m.name
+                                                    )
+                                                );
+                                            })
+                                        ) : _react2.default.createElement(
+                                            'div',
+                                            {
+                                                className: 'accordion',
+                                                key: item + '_' + idx
+                                            },
+                                            _react2.default.createElement(
+                                                'div',
+                                                {
+                                                    className: (0, _classnames2.default)('market', {
+                                                        'active': subgroup_active
+                                                    }),
+                                                    onClick: toggleAccordion
+                                                },
+                                                _react2.default.createElement('span', { className: 'icon synthetic_index ' + (open_accordion ? 'active' : '') }),
+                                                _react2.default.createElement(
+                                                    'span',
+                                                    null,
+                                                    group_markets[item].markets[0].subgroup_name
+                                                ),
+                                                _react2.default.createElement('span', { className: 'accordion-icon icon ' + (open_accordion ? 'active' : '') })
+                                            ),
+                                            _react2.default.createElement(
+                                                'div',
+                                                { className: (0, _classnames2.default)('accordion-content', { 'show': open_accordion, 'active': open_accordion && subgroup_active }) },
+                                                group_markets[item].markets.map(function (m) {
+                                                    return _react2.default.createElement(
+                                                        'div',
+                                                        {
+                                                            className: 'subgroup market ' + (active_market === m.key ? 'subgroup-active' : ''),
+                                                            key: m.key,
+                                                            onClick: scrollToMarket.bind(null, '' + m.key)
+                                                        },
+                                                        _react2.default.createElement(
+                                                            'span',
+                                                            null,
+                                                            m.name
+                                                        )
+                                                    );
+                                                })
+                                            )
                                         )
                                     );
                                 })
@@ -21721,23 +22097,42 @@ var Markets = (_temp = _class = function (_React$Component) {
                                 'div',
                                 { className: 'mobile' },
                                 _react2.default.createElement(
-                                    'ul',
+                                    _react2.default.Fragment,
                                     null,
-                                    markets.map(function (_ref10) {
-                                        var _ref11 = _slicedToArray(_ref10, 1),
-                                            key = _ref11[0];
-
-                                        return _react2.default.createElement(
-                                            'li',
-                                            {
-                                                onClick: scrollToMarket.bind(null, key),
-                                                key: key,
-                                                'data-market': key,
-                                                className: active_market === key ? 'active' : ''
-                                            },
-                                            _react2.default.createElement('span', { className: 'icon ' + key + ' ' + (active_market === key ? 'active' : '') })
-                                        );
-                                    })
+                                    _react2.default.createElement(
+                                        'ul',
+                                        null,
+                                        Object.keys(group_markets).map(function (item) {
+                                            var derived_category = group_markets[item].markets[0].key;
+                                            return item === 'none' ? _react2.default.createElement(
+                                                _react2.default.Fragment,
+                                                null,
+                                                group_markets[item].markets.map(function (m) {
+                                                    return _react2.default.createElement(
+                                                        'li',
+                                                        {
+                                                            onClick: scrollToMarket.bind(null, m.key),
+                                                            key: m.key,
+                                                            'data-market': m.key,
+                                                            className: active_market === m.key ? 'active' : ''
+                                                        },
+                                                        _react2.default.createElement('span', { className: 'icon ' + m.key + ' ' + (active_market === m.key ? 'active' : '') })
+                                                    );
+                                                })
+                                            ) : _react2.default.createElement(
+                                                'li',
+                                                {
+                                                    onClick: scrollToMarket.bind(null, derived_category),
+                                                    key: derived_category,
+                                                    'data-market': derived_category,
+                                                    className: (0, _classnames2.default)('', {
+                                                        'active': subgroup_active
+                                                    })
+                                                },
+                                                _react2.default.createElement('span', { className: 'icon synthetic_index ' + (active_market === derived_category || subgroup_active ? 'active' : '') })
+                                            );
+                                        })
+                                    )
                                 )
                             )
                         ),
@@ -21752,7 +22147,8 @@ var Markets = (_temp = _class = function (_React$Component) {
                                 arr: markets,
                                 saveRef: saveMarketRef,
                                 underlying: underlying.symbol,
-                                onUnderlyingClick: onUnderlyingClick
+                                onUnderlyingClick: onUnderlyingClick,
+                                groupMarkets: groupMarkets
                             })
                         )
                     )
@@ -21769,7 +22165,17 @@ var Markets = (_temp = _class = function (_React$Component) {
         _this2.setState({
             open: false,
             query: '',
-            markets: _this2.markets_all
+            markets: _this2.markets_all,
+            open_accordion: false,
+            subgroup_active: false
+        });
+    };
+
+    this.toggleAccordion = function () {
+        _this2.setState(function (prevState) {
+            return _extends({}, prevState, {
+                open_accordion: !prevState.open_accordion
+            });
         });
     };
 
@@ -21797,13 +22203,24 @@ var Markets = (_temp = _class = function (_React$Component) {
         var position = e.target.scrollTop + list.offsetTop;
         var arr = [];
         var curr_market = null;
-        Object.entries(market_nodes).forEach(function (_ref12) {
-            var _ref13 = _slicedToArray(_ref12, 2),
-                key = _ref13[0],
-                node = _ref13[1];
+
+        Object.entries(market_nodes).forEach(function (_ref10) {
+            var _ref11 = _slicedToArray(_ref10, 2),
+                key = _ref11[0],
+                node = _ref11[1];
 
             if (node && node.offsetParent && node.offsetTop - 41 <= position) {
                 arr.push(key);
+                if (_this2.keys_arr.includes(key)) {
+                    _this2.setState({
+                        subgroup_active: true,
+                        open_accordion: true
+                    });
+                } else {
+                    _this2.setState({
+                        subgroup_active: false
+                    });
+                }
             }
         });
         if (_this2.state.active_market !== arr[arr.length - 1]) {
@@ -21908,6 +22325,7 @@ var Markets = (_temp = _class = function (_React$Component) {
         var class_under = 'put_under';
         var TITLE_HEIGHT = 40;
         var DEFAULT_TOP = _this2.references.list.offsetTop;
+        var SUBGROUP_LABEL = document.getElementsByClassName('label');
 
         var current_viewed_node = Object.values(market_nodes).find(function (node) {
             return node.dataset.offsetTop <= position && +node.dataset.offsetHeight + +node.dataset.offsetTop > position;
@@ -21920,6 +22338,7 @@ var Markets = (_temp = _class = function (_React$Component) {
                 node.removeAttribute('style');
                 node.children[0].removeAttribute('style');
                 node.children[0].classList.remove(class_under, class_sticky);
+                node.children[1].classList.remove(class_under, class_sticky);
             });
             _this2.references.last_viewed_node = current_viewed_node;
         }
@@ -21931,6 +22350,11 @@ var Markets = (_temp = _class = function (_React$Component) {
         } else {
             current_viewed_node.children[0].removeAttribute('style');
             current_viewed_node.children[0].classList.remove(class_under);
+        }
+        if ((0, _os_detect.isMobile)() && current_viewed_node.classList.contains('subgroup') && !current_viewed_node.classList.contains('label')) {
+            SUBGROUP_LABEL[0].classList.add(class_sticky);
+            SUBGROUP_LABEL[0].removeAttribute('style');
+            SUBGROUP_LABEL[0].classList.remove(class_under);
         }
         current_viewed_node.children[0].classList.add(class_sticky);
         current_viewed_node.style.paddingTop = TITLE_HEIGHT + 'px';
@@ -21945,6 +22369,23 @@ var Markets = (_temp = _class = function (_React$Component) {
         node.dataset.offsetHeight = node.offsetHeight;
     };
 
+    this.groupMarkets = function (markets) {
+        var market_group = {};
+        markets.forEach(function (_ref12) {
+            var _ref13 = _slicedToArray(_ref12, 2),
+                key = _ref13[0],
+                obj = _ref13[1];
+
+            if (market_group[obj.subgroup]) {
+                market_group[obj.subgroup].markets.push({ name: obj.name, key: key, subgroup_name: obj.subgroup_name, submarket: obj.submarkets });
+            } else {
+                market_group[obj.subgroup] = { markets: [{ name: obj.name, key: key, subgroup_name: obj.subgroup_name, submarket: obj.submarkets }]
+                };
+            }
+        });
+        return market_group;
+    };
+
     this.searchSymbols = function (_ref14) {
         var query = _ref14.target.value;
 
@@ -21952,7 +22393,7 @@ var Markets = (_temp = _class = function (_React$Component) {
         scrollToPosition(_this2.references.list, 0, 0);
         var markets_all = _this2.markets_all;
         if (!query) {
-            _this2.setState({ markets: markets_all });
+            _this2.setState({ markets: markets_all, subgroup_active: false, open_accordion: false });
             return;
         }
         var filter_markets = [];
@@ -21993,6 +22434,17 @@ var Markets = (_temp = _class = function (_React$Component) {
                 var market_copy = JSON.parse(JSON.stringify(market));
                 market_copy.submarkets = filter_submarkets;
                 filter_markets.push([key, market_copy]);
+                if (_this2.keys_arr.includes(filter_markets[0][0])) {
+                    _this2.setState({
+                        subgroup_active: true,
+                        open_accordion: true
+                    });
+                } else {
+                    _this2.setState({
+                        subgroup_active: false,
+                        open_accordion: false
+                    });
+                }
             }
         });
 
@@ -22296,7 +22748,18 @@ var Price = function () {
         var currency = CommonFunctions.getVisibleElement('currency');
 
         if (!h4) return;
+
+        var form_name = Defaults.get('formname');
         var display_text = type && contract_type ? contract_type[type] : '';
+
+        if (form_name === 'risefall' || form_name === 'callputequal') {
+            if (type === 'CALL' || type === 'CALLE') {
+                display_text = localize('Rise');
+            } else {
+                display_text = localize('Fall');
+            }
+        }
+
         if (display_text) {
             h4.setAttribute('class', 'contract_heading ' + type);
             CommonFunctions.elementTextContent(h4, display_text);
@@ -23491,6 +23954,8 @@ var Defaults = __webpack_require__(/*! ./defaults */ "./src/javascript/app/pages
 var Durations = __webpack_require__(/*! ./duration */ "./src/javascript/app/pages/trade/duration.js");
 var getElementById = __webpack_require__(/*! ../../../_common/common_functions */ "./src/javascript/_common/common_functions.js").getElementById;
 var localize = __webpack_require__(/*! ../../../_common/localize */ "./src/javascript/_common/localize.js").localize;
+var localizeForLang = __webpack_require__(/*! ../../../_common/localize */ "./src/javascript/_common/localize.js").forLang;
+var urlLang = __webpack_require__(/*! ../../../_common/language */ "./src/javascript/_common/language.js").urlLang;
 var State = __webpack_require__(/*! ../../../_common/storage */ "./src/javascript/_common/storage.js").State;
 var createElement = __webpack_require__(/*! ../../../_common/utility */ "./src/javascript/_common/utility.js").createElement;
 
@@ -23544,6 +24009,7 @@ var StartDates = function () {
             var default_start = Defaults.get('date_start') || 'now';
 
             var rounding = 5 * 60 * 1000;
+            localizeForLang(urlLang());
             var now = moment.utc();
             start_dates.list.forEach(function (start_date) {
                 var date_open = moment.unix(start_date.open).utc();
@@ -24246,7 +24712,7 @@ var TickDisplay = function () {
         chart.yAxis[0].addPlotLine(_extends({
             id: config.id || 'tick-barrier',
             value: config.value || contract.barrier,
-            color: 'green',
+            color: config.color || 'green',
             label: config.label,
             width: 2,
             zIndex: 2
@@ -24271,7 +24737,8 @@ var TickDisplay = function () {
             var is_resetcall = contract.contract_type === 'RESETCALL';
             setBarrier({
                 label: { text: localize('Reset Barrier') + ' (' + addComma(contract.barrier, display_decimals) + ')', align: 'right', x: -60, y: is_resetcall ? 15 : -5 },
-                id: 'tick-reset-barrier'
+                id: 'tick-reset-barrier',
+                color: '#000'
             });
             setBarrier({
                 value: contract.entry_spot,
@@ -25205,6 +25672,7 @@ var TopUpVirtualPopup = function () {
 
     return {
         init: init,
+        doTopUp: doTopUp,
         shouldShow: shouldShowPopup,
         show: showTopUpPopup
     };
@@ -27954,6 +28422,8 @@ module.exports = RealityCheckUI;
 "use strict";
 
 
+function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
+
 var PortfolioInit = __webpack_require__(/*! ./account/portfolio/portfolio.init */ "./src/javascript/app/pages/user/account/portfolio/portfolio.init.js");
 var updateTotal = __webpack_require__(/*! ./update_total */ "./src/javascript/app/pages/user/update_total.js");
 var updateContractBalance = __webpack_require__(/*! ../trade/update_values */ "./src/javascript/app/pages/trade/update_values.js").updateContractBalance;
@@ -27962,10 +28432,33 @@ var BinarySocket = __webpack_require__(/*! ../../base/socket */ "./src/javascrip
 var formatMoney = __webpack_require__(/*! ../../common/currency */ "./src/javascript/app/common/currency.js").formatMoney;
 var TopUpVirtualPopup = __webpack_require__(/*! ../../pages/user/account/top_up_virtual/pop_up */ "./src/javascript/app/pages/user/account/top_up_virtual/pop_up.js");
 var getPropertyValue = __webpack_require__(/*! ../../../_common/utility */ "./src/javascript/_common/utility.js").getPropertyValue;
+var createElement = __webpack_require__(/*! ../../../_common/utility */ "./src/javascript/_common/utility.js").createElement;
+var localize = __webpack_require__(/*! ../../../_common/localize */ "./src/javascript/_common/localize.js").localize;
 
 var updateBalance = function updateBalance(response) {
     if (getPropertyValue(response, 'error')) {
         return;
+    }
+
+    function waitForReadyElement(selector) {
+        return new Promise(function (resolve) {
+            if (document.querySelector(selector)) {
+                return resolve(document.querySelector(selector));
+            }
+
+            var observer = new MutationObserver(function () {
+                if (document.querySelector(selector)) {
+                    resolve(document.querySelector(selector));
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            return null;
+        });
     }
 
     BinarySocket.wait('website_status').then(function () {
@@ -27977,44 +28470,80 @@ var updateBalance = function updateBalance(response) {
             total = _response$balance.total;
 
         if (!currency) return;
+        var updateBalanceByAccountId = function () {
+            var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(account_id, updated_balance, account_currency) {
+                var el_balance_span, reset_button, display_balance, is_virtual, is_current, total_prop;
+                return regeneratorRuntime.wrap(function _callee$(_context) {
+                    while (1) {
+                        switch (_context.prev = _context.next) {
+                            case 0:
+                                _context.next = 2;
+                                return waitForReadyElement('.account__switcher-balance-' + account_id);
 
-        var updateBalanceByAccountId = function updateBalanceByAccountId(account_id, updated_balance, account_currency) {
-            var el_balance_span = document.querySelector('.account__switcher-balance-' + account_id);
+                            case 2:
+                                el_balance_span = _context.sent;
+                                reset_button = createElement('button', { text: localize('Reset balance'), class: 'account__switcher-balance btn btn--secondary btn__small reset_btn' });
 
-            if (el_balance_span) {
-                var display_balance = formatMoney(account_currency, updated_balance);
 
-                el_balance_span.innerHTML = display_balance;
+                                if (el_balance_span) {
+                                    display_balance = formatMoney(account_currency, updated_balance);
 
-                var is_virtual = /^VRT/.test(account_id);
-                var is_current = Client.get('loginid') === account_id;
 
-                if (is_current) {
-                    document.getElementById('header__acc-balance').innerHTML = display_balance;
-                    Client.set('balance', updated_balance);
-                    PortfolioInit.updateBalance();
-                }
+                                    el_balance_span.innerHTML = display_balance;
 
-                if (is_virtual) {
-                    TopUpVirtualPopup.init(updated_balance);
-                    updateTotal({
-                        amount: updated_balance,
-                        currency: account_currency,
-                        type: 'virtual'
-                    });
-                } else {
-                    var total_prop = is_virtual ? 'deriv_demo' : 'deriv';
+                                    is_virtual = /^VRT/.test(account_id);
+                                    is_current = Client.get('loginid') === account_id;
 
-                    if (total[total_prop]) {
-                        updateTotal({
-                            amount: total[total_prop].amount,
-                            currency: total[total_prop].currency,
-                            type: is_virtual ? 'virtual' : 'real'
-                        });
+                                    // show reset button
+
+                                    if (updated_balance !== 10000 && is_virtual && is_current) {
+                                        el_balance_span.innerHTML = null;
+                                        el_balance_span.appendChild(reset_button);
+                                        reset_button.addEventListener('click', function (e) {
+                                            e.preventDefault();
+                                            TopUpVirtualPopup.doTopUp();
+                                        });
+                                    }
+
+                                    if (is_current) {
+                                        document.getElementById('header__acc-balance').innerHTML = display_balance;
+                                        Client.set('balance', updated_balance);
+                                        PortfolioInit.updateBalance();
+                                    }
+
+                                    if (is_virtual) {
+                                        TopUpVirtualPopup.init(updated_balance);
+                                        updateTotal({
+                                            amount: updated_balance,
+                                            currency: account_currency,
+                                            type: 'virtual'
+                                        });
+                                    } else {
+                                        total_prop = is_virtual ? 'deriv_demo' : 'deriv';
+
+
+                                        if (total[total_prop]) {
+                                            updateTotal({
+                                                amount: total[total_prop].amount,
+                                                currency: total[total_prop].currency,
+                                                type: is_virtual ? 'virtual' : 'real'
+                                            });
+                                        }
+                                    }
+                                }
+
+                            case 5:
+                            case 'end':
+                                return _context.stop();
+                        }
                     }
-                }
-            }
-        };
+                }, _callee, undefined);
+            }));
+
+            return function updateBalanceByAccountId(_x, _x2, _x3) {
+                return _ref.apply(this, arguments);
+            };
+        }();
 
         if (accounts) {
             if (!(loginid in accounts)) {
@@ -28049,30 +28578,42 @@ module.exports = updateBalance;
 
 
 var formatMoney = __webpack_require__(/*! ../../common/currency */ "./src/javascript/app/common/currency.js").formatMoney;
+var Client = __webpack_require__(/*! ../../base/client */ "./src/javascript/app/base/client.js");
 
 var total_real = 0;
 var total_virtual = 0;
+var total_currency_virtual = 'USD';
+var total_currency_real = void 0;
 
 var updateTotal = function updateTotal(total) {
     var is_demo_tab = $('#acc_tabs').tabs('option', 'active') === 1;
     var el_total_amount = $('#account__switcher-total-balance-amount');
+    var all_login_ids = Client.getAllLoginids();
+    var real_accounts = all_login_ids.filter(function (loginid) {
+        return !/^VRT/.test(loginid);
+    });
+    var more_than_one_real_account = real_accounts.length > 1;
 
     if (!el_total_amount) {
         return;
     }
-
-    var currency = 'USD';
-
     if (total) {
         if (total.type === 'virtual') {
             total_virtual = total.amount;
+            total_currency_virtual = total.currency;
         } else {
             total_real = total.amount;
+            total_currency_real = total.currency;
         }
-        currency = total.currency;
+    }
+    if (more_than_one_real_account) total_currency_real = 'USD';
+    if (!['USD', 'EUR', 'GBP', 'AUD'].includes(total_currency_real)) {
+        total_currency_real = 'USD';
     }
 
-    var display_amount = formatMoney(currency, is_demo_tab ? total_virtual : total_real);
+    var show_currency = is_demo_tab ? total_currency_virtual : total_currency_real;
+    var display_total = is_demo_tab ? total_virtual : total_real;
+    var display_amount = formatMoney(show_currency, display_total);
     el_total_amount.html(display_amount);
 };
 
@@ -28098,6 +28639,7 @@ var moment = __webpack_require__(/*! moment */ "./node_modules/moment/moment.js"
 var ViewPopupUI = __webpack_require__(/*! ./view_popup.ui */ "./src/javascript/app/pages/user/view_popup/view_popup.ui.js");
 var Highchart = __webpack_require__(/*! ../../trade/charts/highchart */ "./src/javascript/app/pages/trade/charts/highchart.js");
 var Callputspread = __webpack_require__(/*! ../../trade/callputspread */ "./src/javascript/app/pages/trade/callputspread.js");
+var Defaults = __webpack_require__(/*! ../../trade/defaults */ "./src/javascript/app/pages/trade/defaults.js");
 var DigitDisplay = __webpack_require__(/*! ../../trade/digit_trade */ "./src/javascript/app/pages/trade/digit_trade.js");
 var Lookback = __webpack_require__(/*! ../../trade/lookback */ "./src/javascript/app/pages/trade/lookback.js");
 var Reset = __webpack_require__(/*! ../../trade/reset */ "./src/javascript/app/pages/trade/reset.js");
@@ -28183,55 +28725,44 @@ var ViewPopup = function () {
         showContract();
     };
 
-    var ContractTypeDisplay = function () {
-        var contract_type_display = void 0;
-
-        var initContractTypeDisplay = function initContractTypeDisplay() {
-            return {
-                ASIANU: localize('Asian Up'),
-                ASIAND: localize('Asian Down'),
-                CALL: localize('Higher'),
-                CALLE: localize('Higher or equal'),
-                PUT: localize('Lower'),
-                PUTE: localize('Lower or equal'),
-                DIGITMATCH: localize('Digit Matches'),
-                DIGITDIFF: localize('Digit Differs'),
-                DIGITODD: localize('Digit Odd'),
-                DIGITEVEN: localize('Digit Even'),
-                DIGITOVER: localize('Digit Over'),
-                DIGITUNDER: localize('Digit Under'),
-                EXPIRYMISS: localize('Ends Outside'),
-                EXPIRYRANGE: localize('Ends Between'),
-                EXPIRYRANGEE: localize('Ends Between'),
-                LBFLOATCALL: localize('Close-Low'),
-                LBFLOATPUT: localize('High-Close'),
-                LBHIGHLOW: localize('High-Low'),
-                RANGE: localize('Stays Between'),
-                RESETCALL: localize('Reset Call'),
-                RESETPUT: localize('Reset Put'),
-                UPORDOWN: localize('Goes Outside'),
-                ONETOUCH: localize('Touches'),
-                NOTOUCH: localize('Does Not Touch'),
-                CALLSPREAD: localize('Call Spread'),
-                PUTSPREAD: localize('Put Spread'),
-                TICKHIGH: localize('High Tick'),
-                TICKLOW: localize('Low Tick'),
-                RUNHIGH: localize('Only Ups'),
-                RUNLOW: localize('Only Downs'),
-                MULTUP: localize('Multiplier Up'),
-                MULTDOWN: localize('Multiplier Down')
-            };
-        };
+    var ContractTypeDisplay = function ContractTypeDisplay() {
+        var form_name = Defaults.get('formname');
 
         return {
-            get: function get() {
-                if (!contract_type_display) {
-                    contract_type_display = initContractTypeDisplay();
-                }
-                return contract_type_display;
-            }
+            ASIANU: localize('Asian Up'),
+            ASIAND: localize('Asian Down'),
+            CALL: form_name === 'risefall' ? localize('Rise') : localize('Higher'),
+            CALLE: localize('Rise or equal'),
+            PUT: form_name === 'risefall' ? localize('Fall') : localize('Lower'),
+            PUTE: localize('Fall or equal'),
+            DIGITMATCH: localize('Digit Matches'),
+            DIGITDIFF: localize('Digit Differs'),
+            DIGITODD: localize('Digit Odd'),
+            DIGITEVEN: localize('Digit Even'),
+            DIGITOVER: localize('Digit Over'),
+            DIGITUNDER: localize('Digit Under'),
+            EXPIRYMISS: localize('Ends Outside'),
+            EXPIRYRANGE: localize('Ends Between'),
+            EXPIRYRANGEE: localize('Ends Between'),
+            LBFLOATCALL: localize('Close-Low'),
+            LBFLOATPUT: localize('High-Close'),
+            LBHIGHLOW: localize('High-Low'),
+            RANGE: localize('Stays Between'),
+            RESETCALL: localize('Reset Call'),
+            RESETPUT: localize('Reset Put'),
+            UPORDOWN: localize('Goes Outside'),
+            ONETOUCH: localize('Touches'),
+            NOTOUCH: localize('Does Not Touch'),
+            CALLSPREAD: localize('Call Spread'),
+            PUTSPREAD: localize('Put Spread'),
+            TICKHIGH: localize('High Tick'),
+            TICKLOW: localize('Low Tick'),
+            RUNHIGH: localize('Only Ups'),
+            RUNLOW: localize('Only Downs'),
+            MULTUP: localize('Multiplier Up'),
+            MULTDOWN: localize('Multiplier Down')
         };
-    }();
+    };
 
     var showContract = function showContract() {
         setLoadingState(false);
@@ -28240,7 +28771,7 @@ var ViewPopup = function () {
             $container = makeTemplate();
         }
 
-        containerSetText('trade_details_contract_type', ContractTypeDisplay.get()[contract.contract_type]);
+        containerSetText('trade_details_contract_type', ContractTypeDisplay()[contract.contract_type]);
         containerSetText('trade_details_purchase_price', formatMoney(contract.currency, contract.buy_price));
         containerSetText('trade_details_multiplier', formatMoney(contract.currency, multiplier, false, 3, 2));
         if (Lookback.isLookback(contract.contract_type)) {
@@ -29341,6 +29872,52 @@ window.onpageshow = function (event) {
     if (event.persisted) {
         window.location.reload();
     }
+};
+
+/***/ }),
+
+/***/ "./src/templates/_common/brand.config.js":
+/*!***********************************************!*\
+  !*** ./src/templates/_common/brand.config.js ***!
+  \***********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var brand_config_data = {
+    brand_name: 'Deriv',
+    platforms: {
+        smarttrader: {
+            name: 'SmartTrader',
+            icon: 'logo_smart_trader.svg'
+        },
+        dtrader: {
+            name: 'DTrader',
+            icon: 'ic-brand-dtrader.svg'
+        },
+        dbot: {
+            name: 'DBot',
+            icon: 'ic-brand-dbot.svg'
+        },
+        bbot: {
+            name: 'Binary Bot',
+            icon: 'ic-brand-binarybot.svg'
+        }
+    }
+};
+
+var getBrandName = function getBrandName() {
+    return brand_config_data.brand_name;
+};
+var getPlatformSettings = function getPlatformSettings(platform_key) {
+    return brand_config_data.platforms[platform_key];
+};
+
+module.exports = {
+    getBrandName: getBrandName,
+    getPlatformSettings: getPlatformSettings
 };
 
 /***/ }),

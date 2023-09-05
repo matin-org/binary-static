@@ -698,6 +698,52 @@ input[type=checkbox] {
 .no-scroll, .no-scroll body {
   overflow: hidden; }
 
+.platform-unavailable {
+  display: grid;
+  place-content: center; }
+  .platform-unavailable-inner {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+            flex-direction: column;
+    -webkit-box-pack: center;
+        -ms-flex-pack: center;
+            justify-content: center;
+    -webkit-box-align: center;
+        -ms-flex-align: center;
+            align-items: center;
+    height: 80vh;
+    max-width: 600px;
+    text-align: center; }
+    .platform-unavailable-inner-title {
+      color: var(--text-general);
+      font-weight: 700;
+      line-height: 30px;
+      font-size: 1.3225rem;
+      margin-bottom: 30px; }
+    .platform-unavailable-inner-message {
+      font-size: 0.8695652174rem;
+      line-height: 20px;
+      font-weight: 400;
+      margin-bottom: 30px; }
+    .platform-unavailable-inner-button {
+      border-radius: 4px;
+      width: 205px;
+      height: 32px;
+      padding: 6px 16px;
+      background-color: var(--brand-red-coral);
+      color: var(--text-colored-background);
+      font-size: 0.8695652174rem;
+      font-weight: 700;
+      line-height: 20px; }
+      .platform-unavailable-inner-button:hover {
+        -webkit-box-shadow: inset 205px 32px rgba(0, 0, 0, 0.1);
+                box-shadow: inset 205px 32px rgba(0, 0, 0, 0.1);
+        background-color: var(--brand-red-coral); }
+
 .logged_out_title_container {
   margin-top: 40px;
   margin-bottom: 30px; }
@@ -985,11 +1031,6 @@ ul.bullet.gr-row > li {
       -webkit-box-flex: 1;
           -ms-flex: 1;
               flex: 1; }
-
-#dashboard-wrapper #content, #dashboard-wrapper .container {
-  margin: 0;
-  max-width: 100%;
-  padding: 0; }
 
 .foot-note {
   font-size: 0.7561436673rem;
@@ -2039,16 +2080,16 @@ body .topbar {
     body .topbar #language-select:hover {
       background-color: var(--general-hover); }
 
-#livechat {
+#livechat, #topbar-whatsapp {
   cursor: pointer;
   height: inherit; }
-  #livechat img {
+  #livechat img, #topbar-whatsapp img {
     padding: 0 0.4rem;
     width: 16px;
     height: 16px;
     border-left: 1px solid var(--general-section-1);
     border-right: 1px solid var(--general-section-1); }
-  #livechat:hover {
+  #livechat:hover, #topbar-whatsapp:hover {
     background-color: var(--general-hover); }
 
 body .header {
@@ -2154,12 +2195,12 @@ body .header {
             align-items: center;
     height: 100%;
     padding: 0 20px;
-    margin-right: 8px;
     cursor: pointer; }
     body .header__acc-info:hover {
       background: var(--state-hover); }
   body .header__acc-balance {
-    padding: 0 8px;
+    margin-right: 8px;
+    line-height: 24px;
     color: var(--text-profit-success);
     font-size: 1rem;
     font-weight: bold; }
@@ -2167,6 +2208,21 @@ body .header {
     margin-right: 5px;
     height: 25px;
     width: 25px; }
+  body .header__acc-display {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+            flex-direction: column;
+    -webkit-box-pack: center;
+        -ms-flex-pack: center;
+            justify-content: center;
+    padding: 0 10px 1px 0;
+    pointer-events: none; }
+    body .header__acc-display-text {
+      font-size: 0.6575162324rem; }
   body .header__account {
     margin-right: 13px;
     height: -webkit-min-content;
@@ -2185,6 +2241,7 @@ body .header {
       margin: 0 7px;
       cursor: pointer; }
   body .header__deposit {
+    margin-left: 8px;
     margin-right: 16px; }
   body .header__divider {
     height: 32px;
@@ -2428,6 +2485,25 @@ body .header {
         padding: 0 8px; }
       body .header .account__switcher-add-text {
         font-weight: normal; }
+    body .header .account__switcher-manage {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-align: center;
+          -ms-flex-align: center;
+              align-items: center;
+      background-color: transparent;
+      border-radius: 4px;
+      height: 32px;
+      color: var(--text-general);
+      font-size: 0.8695652174rem;
+      border: 1px solid var(--border-hover);
+      padding: 0 16px;
+      margin: 13px 11px 10px 10px; }
+      body .header .account__switcher-manage:hover {
+        background-color: var(--state-hover) !important; }
+      body .header .account__switcher-manage-text {
+        font-weight: bold; }
     body .header .account__switcher-acc {
       display: -webkit-box;
       display: -ms-flexbox;
@@ -2438,16 +2514,64 @@ body .header {
       padding: 3px 8px;
       border-radius: 3px;
       font-size: 0.8695652174rem;
-      cursor: pointer; }
+      cursor: pointer;
+      margin-bottom: 2px; }
+      body .header .account__switcher-acc:last-child {
+        margin-bottom: 8px; }
       body .header .account__switcher-acc--active {
         background: var(--state-hover);
         font-weight: 600; }
+        body .header .account__switcher-acc--active .account__switcher-loginid {
+          color: var(--text-general); }
       body .header .account__switcher-acc:hover {
         background: var(--state-hover); }
       body .header .account__switcher-acc img {
         width: 24px;
         height: 24px;
         margin-right: 8px; }
+    body .header .account__switcher-new-account {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      font-size: 0.8695652174rem;
+      padding: 10px 16px;
+      -webkit-box-align: center;
+          -ms-flex-align: center;
+              align-items: center; }
+      body .header .account__switcher-new-account-text {
+        margin-left: 8px; }
+      body .header .account__switcher-new-account-btn {
+        display: -webkit-box;
+        display: -ms-flexbox;
+        display: flex;
+        -webkit-box-align: center;
+            -ms-flex-align: center;
+                align-items: center;
+        cursor: pointer;
+        margin-left: auto;
+        padding: 0 16px;
+        border-radius: 4px;
+        background: transparent;
+        height: 24px;
+        border: 1px solid var(--border-hover);
+        font-size: 0.7561436673rem; }
+        body .header .account__switcher-new-account-btn a {
+          color: var(--text-general); }
+        body .header .account__switcher-new-account-btn a:visited {
+          color: var(--text-general); }
+    body .header .account__switcher-cfd {
+      display: none;
+      padding: 8px 5px 6px 8px; }
+      body .header .account__switcher-cfd-link {
+        text-decoration: none;
+        font-weight: normal;
+        color: var(--brand-red-coral); }
+        body .header .account__switcher-cfd-link:hover {
+          text-decoration: underline !important; }
+      body .header .account__switcher-cfd-text {
+        font-size: 0.8695652174rem;
+        line-height: 1.5;
+        padding: 8px; }
     body .header .account__switcher-loginid {
       font-size: 0.6575162324rem;
       color: var(--text-less-prominent);
@@ -2455,12 +2579,14 @@ body .header {
       font-weight: normal; }
     body .header .account__switcher-accordion {
       padding: 4px 8px; }
+      body .header .account__switcher-accordion div.ui-helper-reset {
+        line-height: 1; }
       body .header .account__switcher-accordion h3.ui-state-default, body .header .account__switcher-accordion h3.ui-state-active {
         background-image: none;
         background-color: var(--general-main-2);
         color: var(--text-prominent);
         font-weight: 600;
-        font-size: 1rem;
+        font-size: 0.8695652174rem;
         line-height: 1.75;
         border: none;
         padding: 0; }
@@ -2476,7 +2602,7 @@ body .header {
         transition: transform 500ms;
         transition: transform 500ms, -webkit-transform 500ms; }
       body .header .account__switcher-accordion-header-text {
-        height: 40px;
+        height: 36px;
         margin: 0 8px;
         display: -webkit-box;
         display: -ms-flexbox;
@@ -2488,7 +2614,7 @@ body .header {
             -ms-flex-pack: justify;
                 justify-content: space-between; }
     body .header .account__switcher-container {
-      width: 278px;
+      width: 320px;
       padding: 0; }
     body .header .account__switcher-tab {
       width: 50%;
@@ -2560,26 +2686,34 @@ body .header {
       body .header .account__switcher-balance-virtual {
         color: var(--text-general); }
     body .header .account__switcher-logout {
-      display: -webkit-box;
-      display: -ms-flexbox;
-      display: flex;
+      display: grid;
       -webkit-box-align: center;
           -ms-flex-align: center;
               align-items: center;
-      -webkit-box-pack: end;
-          -ms-flex-pack: end;
-              justify-content: flex-end;
-      padding: 16px 13px;
-      float: right;
+      grid-template-columns: auto auto;
+      -webkit-box-pack: justify;
+          -ms-flex-pack: justify;
+              justify-content: space-between;
+      padding: 5px 0 3px 13px;
       cursor: pointer; }
+      body .header .account__switcher-logout-btn {
+        display: -webkit-box;
+        display: -ms-flexbox;
+        display: flex;
+        -webkit-box-align: center;
+            -ms-flex-align: center;
+                align-items: center;
+        padding: 16px 13px; }
       body .header .account__switcher-logout-text {
         font-size: 0.8695652174rem;
-        text-align: left;
-        line-height: 1.5; }
+        text-align: left; }
       body .header .account__switcher-logout-icon {
         height: 16px;
         width: 16px;
         margin-left: 8px; }
+
+#cfd-link-seperator {
+  display: none; }
 
 body .mobile__container {
   background: var(--overlay-outside-dialog) !important;
@@ -2631,24 +2765,6 @@ body .mobile__menu {
       padding: 12px 16px;
       font-size: 1rem;
       font-weight: 600; }
-    body .mobile__menu-header-livechat {
-      -webkit-box-align: center;
-          -ms-flex-align: center;
-              align-items: center;
-      display: -webkit-box;
-      display: -ms-flexbox;
-      display: flex;
-      -webkit-box-pack: end;
-          -ms-flex-pack: end;
-              justify-content: flex-end;
-      padding-right: 16px;
-      width: 100%; }
-      body .mobile__menu-header-livechat > p {
-        font-size: 0.8695652174rem; }
-      body .mobile__menu-header-livechat > img {
-        padding: 0 8px;
-        width: 16px;
-        height: 16px; }
   body .mobile__menu-content {
     height: calc(100% - 77px);
     display: none; }
@@ -2833,6 +2949,13 @@ body #topbar {
     height: 100vh;
     width: 100%;
     top: 48px; }
+
+.url-appstore {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  font-weight: normal;
+  text-transform: none !important; }
 
 #ui-timepicker-div {
   display: -webkit-box;
